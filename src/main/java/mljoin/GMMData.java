@@ -9,7 +9,6 @@ import org.apache.spark.rdd.RDD;
 import scala.Tuple2;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 public class GMMData implements Data {
