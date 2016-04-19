@@ -7,6 +7,7 @@ import java.util.Random;
 import mljoin.LDAOutput.LDATuple;
 
 import org.apache.commons.math3.distribution.*;
+import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -141,6 +142,12 @@ public class LDAData implements Data {
 			}
 		}
 		return output;
+	}
+	
+	public static void main(String [] args) {
+		SparkConf conf = new SparkConf().setMaster("local[*]").setAppName("My local integration test app");
+		SparkContext sc = new SparkContext(conf);
+		testLocal(sc, 6729);
 	}
 	
 	public static RDD<Output> testLocal(SparkContext sc, int listenerPortNumber) {
