@@ -19,10 +19,10 @@ import org.apache.spark.rdd.RDD;
 import scala.Tuple2;
 
 public class LDAData implements Data {
-	public static int WB = 100; 	// total number of wordBlocks
-	public static int V = 10000;	// vocabulary size
+	public static int WB = 10; 	// total number of wordBlocks
+	public static int V = 1000;	// vocabulary size
 	public static int WBS = 100;	// wordBlock size = V / WB
-	public static int T = 10;		// total number of topics
+	public static int T = 2;		// total number of topics
 	
 	private static final long serialVersionUID = -8280023097269439963L;
 	
@@ -116,7 +116,10 @@ public class LDAData implements Data {
 
 		for (int k = 0; k < p.length; k++) {
 			if (p[k] > 0.0) {
-		    	n[k] = new BinomialDistribution(N - sum_n, p[k] / (norm - sum_p)).sample();
+				if (p[k] / (norm - sum_p) > 1)
+					n[k] = new BinomialDistribution(N - sum_n, 1.0).sample();
+				else
+					n[k] = new BinomialDistribution(N - sum_n, p[k] / (norm - sum_p)).sample();
 			} else {
 		    	n[k] = 0;
 			}
@@ -155,7 +158,7 @@ public class LDAData implements Data {
 		for (int i = 0; i < WB; i++)
 			wordBlockIDs.add(i);
 		JavaSparkContext jsc = new JavaSparkContext(sc);
-		JavaRDD<String> initialData = jsc.textFile("wiki_en_bow.mm");
+		JavaRDD<String> initialData = jsc.textFile("/Users/jacobgao/Downloads/wordblock.tbl");
 		JavaRDD<Tuple2<Integer, Data>> data = initialData.map(new Function<String, Tuple2<Integer, Data>>() {
 
 			@Override
