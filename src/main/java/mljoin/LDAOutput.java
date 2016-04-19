@@ -1,5 +1,6 @@
 package mljoin;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 public class LDAOutput implements Output {
@@ -19,8 +20,9 @@ public class LDAOutput implements Output {
 		return tuples;
 	}
 
-	public class LDATuple {
-
+	public class LDATuple implements Serializable {
+		private static final long serialVersionUID = 5605710211026872436L;
+		
 		int topicID;
 		int wordID;
 		int count;

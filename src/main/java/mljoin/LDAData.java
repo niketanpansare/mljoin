@@ -2,6 +2,7 @@ package mljoin;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Random;
 
 import mljoin.LDAOutput.LDATuple;
@@ -150,10 +151,10 @@ public class LDAData implements Data {
 	public static void main(String [] args) {
 		SparkConf conf = new SparkConf().setMaster("local[*]").setAppName("My local integration test app");
 		SparkContext sc = new SparkContext(conf);
-		testLocal(sc, 6729);
+		testGlobal(sc);
 	}
 	
-	public static RDD<Output> testLocal(SparkContext sc, int listenerPortNumber) {
+	public static RDD<Output> testGlobal(SparkContext sc) {
 		ArrayList<Integer> wordBlockIDs = new ArrayList<Integer>();
 		for (int i = 0; i < WB; i++)
 			wordBlockIDs.add(i);
@@ -177,9 +178,9 @@ public class LDAData implements Data {
 			
 		});
 		JavaRDD<Tuple2<Integer, Model>> models = jsc.parallelize(wordBlockIDs).map(wordBlockID -> new Tuple2<Integer, Model>(wordBlockID, new LDAModel(wordBlockID)));
-		RDD<Output> output = (new MLJoin()).local(sc, models.rdd(), data.rdd(), listenerPortNumber, true);
+		RDD<Output> output = (new MLJoin()).global(sc, models.rdd(), data.rdd());
 		// update model.topicProbs based on all data
-		output.toJavaRDD().flatMap(
+		List<LDAModel> newModels = output.toJavaRDD().flatMap(
 				o -> ((LDAOutput) o).getTuples()).mapToPair(
 				tuple -> new Tuple2<Integer, LDATuple>(tuple.getTopicID(), tuple)).aggregateByKey(
 				new int[V], (x, y) -> {x[y.getWordID()] += y.getCount(); return x;}, (x, y) -> {for (int i = 0; i < V; i++) x[i] += y[i]; return x;}).flatMapToPair(
@@ -197,7 +198,7 @@ public class LDAData implements Data {
 								return result;  
 				            }  
 		        }).join(models.mapToPair(model -> new Tuple2<Integer, Model>(model._1, model._2))).map(
-		        x -> {((LDAModel) x._2._2).setTopicRow(x._2._1._1, x._2._1._2); return new Tuple2<Integer, Model>(x._1, x._2._2);});
+		        x -> ((LDAModel) x._2._2).setTopicRow(x._2._1._1, x._2._1._2)).distinct().collect();
 		return output;
 	}
 	
