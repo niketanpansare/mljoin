@@ -3,17 +3,14 @@ package mljoin;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 
 import mljoin.LDAOutput.LDATuple;
 
-import org.apache.commons.math3.distribution.*;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.rdd.RDD;
 
@@ -40,7 +37,7 @@ public class LDAData implements Data {
 		this.wordCounts = wordCounts;
 		// initialize docProbs with Dirichlet(prior) <=> Gamma(prior, 1)
 		docProbs = new double[T];
-		dirichlet(docProbs, 1.0);
+		StatUtils.dirichlet(docProbs, 1.0);
 	}
 
 	@Override
@@ -54,92 +51,22 @@ public class LDAData implements Data {
 		for (LDATuple tuple : tuples) {
 			sumByTopic[tuple.getTopicID()] += tuple.getCount();
 		}
-		dirichletConjugate(docProbs, sumByTopic, 1.0);
+		StatUtils.dirichletConjugate(docProbs, sumByTopic, 1.0);
 		// output topicsOfWords
 		return output;
-	}
-	
-	public void dirichlet(double[] samples, double prior) {
-		GammaDistribution gd = new GammaDistribution(prior, 1);
-		double sum = 0.0;
-		for (int i = 0; i < samples.length; i++) {
-			samples[i] = gd.sample();
-			sum += samples[i];
-		}
-		for (int i = 0; i < samples.length; i++) {
-			samples[i] /= sum;
-		}
-	}
-	
-	public void dirichletConjugate(double[] samples, int[] counts, double prior) {
-		double sum = 0.0;
-		for (int i = 0; i < samples.length; i++) {
-			samples[i] = (new GammaDistribution(counts[i] + prior, 1)).sample();
-			sum += samples[i];
-		}
-		for (int i = 0; i < samples.length; i++) {
-			samples[i] /= sum;
-		}
-	}
-	
-	public static HashMap<Integer, double[]> dirichletConjugateSplitIntoWordBlocks(int[] counts, double prior) {
-		HashMap<Integer, double[]> result = new HashMap<>();
-		double samples[] = new double[counts.length];
-		double sum = 0.0;
-		for (int i = 0; i < samples.length; i++) {
-			samples[i] = (new GammaDistribution(counts[i] + prior, 1)).sample();
-			sum += samples[i];
-		}
-		for (int i = 0; i < samples.length; i++) {
-			samples[i] /= sum;
-		}
-		for (int i = 0; i < WB; i++) {
-			double temp[] = new double[WBS];
-			for (int j = 0; j < WBS; j++) {
-				temp[j] = samples[i * WBS + j];
-			}
-			result.put(i, temp);
-		}
-		return result;
-	}
-	
-	public void multinomial(int N, double[] p, int[] n) {
-		double norm = 0.0;
-		double sum_p = 0.0;
-		int sum_n = 0;
-
-		/* p[k] may contain non-negative weights that do not sum to 1.0.
-		 * Even a probability distribution will not exactly sum to 1.0
-		 * due to rounding errors. 
-		 */
-		for (int k = 0; k < p.length; k++)
-			norm += p[k];
-
-		for (int k = 0; k < p.length; k++) {
-			if (p[k] > 0.0) {
-				if (p[k] / (norm - sum_p) > 1)
-					n[k] = new BinomialDistribution(N - sum_n, 1.0).sample();
-				else
-					n[k] = new BinomialDistribution(N - sum_n, p[k] / (norm - sum_p)).sample();
-			} else {
-		    	n[k] = 0;
-			}
-			sum_p += p[k];
-			sum_n += n[k];
-		}
 	}
 	
 	public LDAOutput multinomialWordTopic(int[] wordVector, int[] countVector, double[] docVector, double[][] topicMatrix) {
 		LDAOutput output = new LDAOutput();
 		for (int i = 0; i < wordVector.length; i++) {
-			double workProbs[] = new double[docVector.length];
-			for (int j = 0; j < docVector.length; j++) {
+			double workProbs[] = new double[T];
+			for (int j = 0; j < T; j++) {
 				workProbs[j] = docVector[j] * topicMatrix[j][wordVector[i]];
 			}
-			int outputCounts[] = new int[docVector.length];
+			int outputCounts[] = new int[T];
 			// multinomial distribution to generate outputCounts based on countVector[i] and workProbs
-			multinomial(countVector[i], workProbs, outputCounts);
-			for (int j = 0; j < outputCounts.length; j++) {
+			StatUtils.multinomial(countVector[i], workProbs, outputCounts);
+			for (int j = 0; j < T; j++) {
 				if (outputCounts[j] > 0) {
 					output.addTuple(j, wordBlockID * WBS + wordVector[i], outputCounts[j]);
 				}	
@@ -189,7 +116,7 @@ public class LDAData implements Data {
 				            @Override  
 				            public Iterable<Tuple2<Integer, Tuple2<Integer, double[]>>> call(Tuple2<Integer, int[]> tuple) throws Exception {
 				            	int topicID = tuple._1;
-				            	HashMap<Integer, double[]> topicProbs = dirichletConjugateSplitIntoWordBlocks(tuple._2, 1.0);
+				            	HashMap<Integer, double[]> topicProbs = StatUtils.dirichletConjugateSplitIntoWordBlocks(tuple._2, 1.0, WB, WBS);
 								ArrayList<Tuple2<Integer, Tuple2<Integer, double[]>>> result = new ArrayList<>();
 								for (HashMap.Entry<Integer, double[]> entry : topicProbs.entrySet()) {
 									Tuple2<Integer, double[]> newtuple = new Tuple2<Integer, double[]>(topicID, entry.getValue());
