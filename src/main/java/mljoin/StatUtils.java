@@ -85,7 +85,9 @@ public class StatUtils {
 	
 	public static void multivariateNormal(double[] samples, double[] mean, double[][] covariance) {
 		MultivariateNormalDistribution mnd = new MultivariateNormalDistribution(mean, covariance);
-		samples = mnd.sample();
+		double[] sampleVector = mnd.sample();
+		for (int i = 0; i < samples.length; i++)
+			samples[i] = sampleVector[i];
 	}
 	
 	public static void inverseWishart(double[][] samples, double[][] variance, int iwM) {
@@ -105,28 +107,32 @@ public class StatUtils {
 			CholeskyDecomposition scaleMatInvDecomposed = new CholeskyDecomposition(scaleMatInv);
 			RealMatrix product = scaleMatInvDecomposed.getL().multiply(MatrixUtils.createRealMatrix(work));
 			
-			// reverse the result 
-			samples = MatrixUtils.inverse(product.multiply(product.transpose())).getData();
-
+			// reverse the result
+			double[][] sampleMatrix = MatrixUtils.inverse(product.multiply(product.transpose())).getData();
+			
 			boolean isSingular = false;
-			for (int i = 0; i < samples.length; i++) {
-				double u = samples[i][i];
+			for (int i = 0; i < sampleMatrix.length; i++) {
+				double u = sampleMatrix[i][i];
 				if (u == 0) { 												// singular matrix
 					isSingular = true;
 					break;
 				}
 			}
-			for (int i = 0; i < samples.length; i++) {
-				for(int j = 0; j < samples.length; j++) {
-					double u = samples[i][j];
+			for (int i = 0; i < sampleMatrix.length; i++) {
+				for(int j = 0; j < sampleMatrix.length; j++) {
+					double u = sampleMatrix[i][j];
 					if (Double.isNaN(u) || Double.isInfinite(u)) { 			// singular matrix
 						isSingular = true;
 						break;
 					}
 				}
 			}
-			if (!isSingular)
+			if (!isSingular) {
 				isLegalSample = true;
+				for (int i = 0; i < samples.length; i++)
+					for (int j = 0; j < samples.length; j++)
+						samples[i][j] = sampleMatrix[i][j];
+			}
 		}
 	}
 	
