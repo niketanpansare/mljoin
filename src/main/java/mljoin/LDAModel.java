@@ -18,8 +18,9 @@ public class LDAModel implements Model {
 		return topicProbs;
 	}
 	
-	public void setTopicRow(int topicID, double[] topicProb) {
+	public LDAModel setTopicRow(int topicID, double[] topicProb) {
 		topicProbs[topicID] = topicProb;
+		return this;
 	}
 
 	@Override
