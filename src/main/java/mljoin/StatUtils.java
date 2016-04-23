@@ -103,9 +103,8 @@ public class StatUtils {
 			}
 
 			// reverse the scale_matrix
-			RealMatrix scaleMatInv = MatrixUtils.inverse(MatrixUtils.createRealMatrix(variance));
-			CholeskyDecomposition scaleMatInvDecomposed = new CholeskyDecomposition(scaleMatInv);
-			RealMatrix product = scaleMatInvDecomposed.getL().multiply(MatrixUtils.createRealMatrix(work));
+			CholeskyDecomposition scaleMatDecomposed = new CholeskyDecomposition(MatrixUtils.createRealMatrix(variance));
+			RealMatrix product = MatrixUtils.inverse(scaleMatDecomposed.getLT()).multiply(MatrixUtils.createRealMatrix(work));
 			
 			// reverse the result
 			double[][] sampleMatrix = MatrixUtils.inverse(product.multiply(product.transpose())).getData();
