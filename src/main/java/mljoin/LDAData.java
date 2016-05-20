@@ -13,6 +13,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.rdd.RDD;
+import org.apache.spark.sql.SQLContext;
 
 import scala.Tuple2;
 
@@ -78,7 +79,11 @@ public class LDAData implements Data {
 	public static void main(String [] args) {
 		SparkConf conf = new SparkConf().setMaster("local[*]").setAppName("My local integration test app");
 		SparkContext sc = new SparkContext(conf);
-		testGlobal(sc);
+		SQLContext sqlCtx = new SQLContext(sc);
+		LDADemo demo = new LDADemo();
+		
+		demo.naiveLDA(sqlCtx, demo.randData(sc), demo.randData(sc), demo.randData(sc));
+		// testGlobal(sc);
 	}
 	
 	public static RDD<Output> testGlobal(SparkContext sc) {
