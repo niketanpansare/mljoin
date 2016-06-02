@@ -8,9 +8,19 @@ import org.apache.spark.rdd._
 
 class LDADemo extends Serializable {
   
-  def assignTopicsNaive(topicID:Int, wordProbs:Vector, topicProbs:Vector, docID:Int, wordCnts:Vector) = {
+  // Iterable[(topicID:Int, wordProbs:Vector, topicProbs:Vector, wordCnts:Vector)]
+  def assignTopicsNaive(docID:Int, other:Iterable[(Int, Vector, Vector, Vector)]) = {
     // TODO:  
-    wordProbs
+    var ret = 0
+    for(vals <- other) {
+      val topicID:Int = vals._1
+      val wordProbs:Vector = vals._2
+      val topicProbs:Vector = vals._3
+      val wordCnts:Vector = vals._4
+      // TODO: Jacob
+      ret = ret + wordProbs.numNonzeros
+    }
+    ret
   }
   
   def naiveLDA(sqlContext:SQLContext, topicsRDD:RDD[(Int, Vector)], topicProbsRDD:RDD[(Int, Vector)], docsRDD:RDD[(Int, Vector)]): 
@@ -26,14 +36,14 @@ class LDADemo extends Serializable {
     docs.registerTempTable("docs")
     sqlContext.udf.register("assignTopicsNaive", assignTopicsNaive _)
     val produced = sqlContext.sql(
-        """ SELECT assignTopicsNaive(t.topicID, t.wordProbs, tp.topicProbs, d.docID, d.wordCnts)
+        """ SELECT d.docID, t.topicID, t.wordProbs, tp.topicProbs, d.wordCnts
             FROM topics t, topicProbs tp, docs d
             WHERE tp.docID = d.docID
-            """)
+            """).rdd.map(x => (x(0), (x(1), x(2), x(3), x(4)))).groupByKey.map(x => assignTopicsNaive(x._1.toString.toInt, x._2.asInstanceOf[Iterable[(Int, Vector, Vector, Vector)]]))
     
     // TODO:
     // val tmp = produced.rdd.flatMap( ... ).reduceByKey( ... )
-    produced.show
+    // produced.show
     
     (topicsRDD, topicProbsRDD)
   }
