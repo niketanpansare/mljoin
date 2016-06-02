@@ -8,19 +8,22 @@ import org.apache.spark.rdd._
 
 class LDADemo extends Serializable {
   
+  val numTopics: Int = 100
+  val vocabSize: Int = 100
+  
   // Iterable[(topicID:Int, wordProbs:Vector, topicProbs:Vector, wordCnts:Vector)]
   def assignTopicsNaive(docID:Int, other:Iterable[(Int, Vector, Vector, Vector)]) = {
     // TODO:  
-    var ret = 0
+    var wordCnts11:DenseMatrix = DenseMatrix.zeros(numTopics, vocabSize) 
     for(vals <- other) {
       val topicID:Int = vals._1
       val wordProbs:Vector = vals._2
       val topicProbs:Vector = vals._3
       val wordCnts:Vector = vals._4
       // TODO: Jacob
-      ret = ret + wordProbs.numNonzeros
+      // ret = ret + wordProbs.numNonzeros
     }
-    ret
+    wordCnts11
   }
   
   def naiveLDA(sqlContext:SQLContext, topicsRDD:RDD[(Int, Vector)], topicProbsRDD:RDD[(Int, Vector)], docsRDD:RDD[(Int, Vector)]): 
