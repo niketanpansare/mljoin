@@ -80,6 +80,19 @@ class Test extends Logging with Serializable {
             del.val2 + d.asInstanceOf[TestData2].val2).asInstanceOf[TestDelta2])
         ret
       }
+      def test_local_g1(m:Model2): Object = {
+        System.out.println(">" + m.asInstanceOf[TestModel2].val1)
+        new TestDelta2(m.asInstanceOf[TestModel2].val1, m.asInstanceOf[TestModel2].val2)
+      }
+      
+      def test_local_g2(del1:Object, d:Data2): Iterable[Delta2] = {
+        val ret = new ArrayList[Delta2]
+        val del = del1.asInstanceOf[TestDelta2]
+        System.out.println("-" + del.val1)
+        ret.add(new TestDelta2(del.val1 + d.asInstanceOf[TestData2].val1,
+            del.val2 + d.asInstanceOf[TestData2].val2).asInstanceOf[TestDelta2])
+        ret
+      }
 //      def old_test_g(m:Model2)(d:Data2):Iterable[Delta2] = {
 //        val ret = new ArrayList[Delta2]
 //        ret.add(new TestDelta2(m.asInstanceOf[TestModel2].val1 + d.asInstanceOf[TestData2].val1,
@@ -90,18 +103,78 @@ class Test extends Logging with Serializable {
         new TestOutput2(d.asInstanceOf[TestData2].val1-it.head.asInstanceOf[TestDelta2].val1, 
            d.asInstanceOf[TestData2].val2-it.head.asInstanceOf[TestDelta2].val2)
       }
-      (new MLJoin2(test_g _, test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _)).joinNCoGroup(sqlContext, models, data, "naive", false)
+      if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+      }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
     }
 }
 
-class MLJoin2(g: Model2 => Data2 => Iterable[Delta2],
+class MLJoin2(
         // For natural join: 
         B_i_model_hash: Model2 => Long,
         B_i_data_hash: Data2 => Long,
         B_i: (Model2, Data2) => Boolean,
         agg: (Iterable[Delta2], Data2) => Output2) extends Logging with Serializable {
  
-  def convertDataToDF(sqlContext:SQLContext, X:RDD[(Long, Data2)], 
+    def serialize(o:Object):Array[Byte] = SerializeUtils.serialize(o)
+    def deserialize(b:Array[Byte]):Object = SerializeUtils.deserialize(b)
+    def serialized_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[Model2], deserialize(d).asInstanceOf[Data2])
+    def serialized_simulated_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[(Model2, Data2 => Iterable[Delta2])]._1, deserialize(d).asInstanceOf[Data2])
+    def serialized_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[(Model2, Object)]._1, deserialize(d).asInstanceOf[Data2])
+    
+    def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, applyHash:Boolean,
+        g: Model2 => Data2 => Iterable[Delta2]): RDD[Output2] = {
+      // Step 1: Seeding
+      seeding(sqlContext, data)
+      
+      // Step 2: Preparing parameters
+      prepareParameters(sqlContext, models, method, g, null, null)
+      
+      if(method.compareToIgnoreCase("naive") == 0) {
+        sqlContext.udf.register("B_i", serialized_B_i _)
+      }
+      else if(method.compareToIgnoreCase("simulated-local") == 0) {
+        sqlContext.udf.register("B_i", serialized_simulated_local_B_i _)
+      }
+      else if(method.compareToIgnoreCase("local") == 0) {
+        throw new RuntimeException("Unsupported method:" + method + ". If you want to apply local method, please use joinNCoGroupLocal")
+      }
+      else {
+        throw new RuntimeException("Unsupported method:" + method)
+      }
+      
+      // Step 3: Spark SQL join n cogroup
+      doSparkSQLJoinNCoGroup(sqlContext, method, applyHash, g, null, null)
+    }
+    
+    def joinNCoGroupLocal(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, applyHash:Boolean,
+        g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
+      // Step 1: Seeding
+      seeding(sqlContext, data)
+      
+      // Step 2: Preparing parameters
+      prepareParameters(sqlContext, models, method, null, g1, g2)
+      
+      if(method.compareToIgnoreCase("local") == 0) {
+        sqlContext.udf.register("B_i", serialized_local_B_i _)
+      }
+      else if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+        throw new RuntimeException("Unsupported method:" + method + ". If you want to apply naive and simulated-local method, please use joinNCoGroup")
+      }
+      else {
+        throw new RuntimeException("Unsupported method:" + method)
+      }
+      
+      // Step 3: Spark SQL join n cogroup
+      doSparkSQLJoinNCoGroup(sqlContext, method, applyHash, null, g1, g2)
+    }
+    
+    def convertDataToDF(sqlContext:SQLContext, X:RDD[(Long, Data2)], 
         B_i_data_hash: Data2 => Long): DataFrame = {
       // Instead of UDT which will get removed in Spark 2.0 https://issues.apache.org/jira/browse/SPARK-14155
       val dataType:StructType = new StructType(
@@ -121,7 +194,7 @@ class MLJoin2(g: Model2 => Data2 => Iterable[Delta2],
       sqlContext.createDataFrame(param.map( x => (new CustomRow(x._1,  B_i_model_hash(x._2), serialize(x._2))).asInstanceOf[Row] ), modelType)
     }
     
-    def convertLocalModelToDF(sqlContext:SQLContext, param :RDD[(Long, (Model2, Data2 => Iterable[Delta2]))], 
+    def convertSimulatedLocalModelToDF(sqlContext:SQLContext, param :RDD[(Long, (Model2, Data2 => Iterable[Delta2]))], 
         B_i_model_hash: Model2 => Long): DataFrame = {
       // Instead of UDT which will get removed in Spark 2.0 https://issues.apache.org/jira/browse/SPARK-14155
       val modelType:StructType = new StructType(
@@ -131,21 +204,56 @@ class MLJoin2(g: Model2 => Data2 => Iterable[Delta2],
       sqlContext.createDataFrame(param.map( x => (new CustomRow(x._1,  B_i_model_hash(x._2._1), serialize(x._2))).asInstanceOf[Row] ), modelType)
     }
     
-    def serialize(o:Object):Array[Byte] = SerializeUtils.serialize(o)
-    def deserialize(b:Array[Byte]):Object = SerializeUtils.deserialize(b)
-        
-    def serialized_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[Model2], deserialize(d).asInstanceOf[Data2])
+    def convertLocalModelToDF(sqlContext:SQLContext, param :RDD[(Long, (Model2, Object))], 
+        B_i_model_hash: Model2 => Long): DataFrame = {
+      // Instead of UDT which will get removed in Spark 2.0 https://issues.apache.org/jira/browse/SPARK-14155
+      val modelType:StructType = new StructType(
+          Array(new StructField("id", LongType, nullable=false), 
+            new StructField("hash", LongType, nullable=false), 
+            new StructField("model", BinaryType, nullable=false)))
+      sqlContext.createDataFrame(param.map( x => (new CustomRow(x._1,  B_i_model_hash(x._2._1), serialize(x._2))).asInstanceOf[Row] ), modelType)
+    }
     
-    def serialized_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[(Model2, Data2 => Iterable[Delta2])]._1, deserialize(d).asInstanceOf[Data2])
-    
-    def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, applyHash:Boolean): RDD[Output2] = {
-      
-      // Step 1: Seeding
+    def seeding(sqlContext:SQLContext, data :RDD[Data2]):Unit = {
       val X :RDD[(Long, Data2)] = data.zipWithIndex().map(x => (x._2, x._1.asInstanceOf[Data2])).persist(StorageLevel.MEMORY_AND_DISK)
-      val count = X.count
-      val XDF:DataFrame = convertDataToDF(sqlContext, X, B_i_data_hash)
-      
-      val sqlStr = if(applyHash)
+      val count1 = X.count
+      val XDF:DataFrame = convertDataToDF(sqlContext, X, B_i_data_hash)             
+      XDF.registerTempTable("Data")
+    }
+    
+    def prepareParameters(sqlContext:SQLContext, models :RDD[Model2], method:String,
+        g: Model2 => Data2 => Iterable[Delta2], g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): Unit = {
+      if(method.compareToIgnoreCase("naive") == 0) {
+        // Step 2: Preparing parameters
+        val param :RDD[(Long, Model2)] = models.zipWithIndex().map(x => (x._2, x._1))
+        val paramDF:DataFrame = convertModelToDF(sqlContext, param, B_i_model_hash)
+        paramDF.registerTempTable("Model")
+      }
+      else if(method.compareToIgnoreCase("simulated-local") == 0) {
+        // Step 2: Preparing parameters
+        val param :RDD[(Long, (Model2, Data2 => Iterable[Delta2]))] = models
+            .zipWithIndex()
+            .map(x => (x._2, (x._1, g(x._1))))
+        val paramDF:DataFrame = convertSimulatedLocalModelToDF(sqlContext, param, B_i_model_hash)
+        paramDF.registerTempTable("Model")
+      }
+      else if(method.compareToIgnoreCase("local") == 0) {
+        // Step 2: Preparing parameters
+        val param :RDD[(Long, (Model2, Object))] = models
+            .zipWithIndex()
+            .map(x => (x._2, (x._1, g1(x._1))))
+        val paramDF:DataFrame = convertLocalModelToDF(sqlContext, param, B_i_model_hash)
+        paramDF.registerTempTable("Model")
+      }
+      else {
+        throw new RuntimeException("Unsupported method:" + method)
+      }
+    }
+    
+    def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, applyHash:Boolean,
+        g: Model2 => Data2 => Iterable[Delta2],
+        g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
+      val sqlStr:String = if(applyHash)
                       """
                       SELECT d.id, m.model, d.data
                       FROM Model m, Data d
@@ -158,25 +266,17 @@ class MLJoin2(g: Model2 => Data2 => Iterable[Delta2],
                       FROM Model m, Data d
                       WHERE B_i(m.model, d.data)
                       """
-      
       var ret :RDD[Output2] = null
       if(method.compareToIgnoreCase("naive") == 0) {
-        // Step 2: Preparing parameters
-        val param :RDD[(Long, Model2)] = models.zipWithIndex().map(x => (x._2, x._1))
+        if(g == null) {
+          throw new RuntimeException("The function g cannot be null");
+        }
         
-        val paramDF:DataFrame = convertModelToDF(sqlContext, param, B_i_model_hash)
-        
-        XDF.registerTempTable("Data")
-        paramDF.registerTempTable("Model")
-        
-        sqlContext.udf.register("B_i", serialized_B_i _)
-        
-        // Join
         val temp:RDD[(Long, Model2, Data2)] = sqlContext.sql(sqlStr).rdd
                       .map(r => (r.get(0).asInstanceOf[Long],
                            deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[Model2],
                            deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2]))
-          
+                           
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
@@ -189,21 +289,8 @@ class MLJoin2(g: Model2 => Data2 => Iterable[Delta2],
                            models.map(g(_)(d)).map(agg(_, d)).map((id, _))
                            }  
                          ).values //.sortByKey().values
-        
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
-        // Step 2: Preparing parameters
-        val param :RDD[(Long, (Model2, Data2 => Iterable[Delta2]))] = models
-            .zipWithIndex()
-            .map(x => (x._2, (x._1, g(x._1))))
-            
-        val paramDF:DataFrame = convertLocalModelToDF(sqlContext, param, B_i_model_hash)
-        
-        XDF.registerTempTable("Data")
-        paramDF.registerTempTable("Model")
-        
-        sqlContext.udf.register("B_i", serialized_local_B_i _)
-        
+      else if(method.compareToIgnoreCase("simulated-local") == 0) {
         // Join
         val temp:RDD[(Long, (Model2, Data2 => Iterable[Delta2]), Data2)] = sqlContext.sql(sqlStr).rdd
                       .map(r => (r.get(0).asInstanceOf[Long],
@@ -222,10 +309,33 @@ class MLJoin2(g: Model2 => Data2 => Iterable[Delta2],
                            models.map(_._2(d)).map(agg(_, d)).map((id, _))
                          }).values //.sortByKey().values
       }
+      else if(method.compareToIgnoreCase("local") == 0) {
+        
+        if(g2 == null) {
+          throw new RuntimeException("The function g2 cannot be null");
+        }
+        // Join
+        val temp:RDD[(Long, (Model2, Object), Data2)] = sqlContext.sql(sqlStr).rdd
+                      .map(r => (r.get(0).asInstanceOf[Long],
+                           deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[(Model2, Object)],
+                           deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2]))
+        
+        // Step 3: Cogroup
+        // Step 4: UDF invocation and final output assembly
+        // TODO: Jacob: Please double check final output assembly
+        ret = temp.map(x => ((x._1, x._3), x._2))
+                         .groupByKey()
+                         .flatMap(x => {
+                           val d:Data2 = x._1._2
+                           val id:Long = x._1._1
+                           val models:Iterable[(Model2, Object)] = x._2
+                           models.map(y => g2(y._2, d)).map(agg(_, d)).map((id, _))
+                         }).values //.sortByKey().values
+      }
       else {
         throw new RuntimeException("Unsupported method:" + method)
       }
       ret
-      
     }
+    
 }
