@@ -125,7 +125,7 @@ class Test extends Logging with Serializable {
       new LDAData2(java.lang.Integer.parseInt(splits(0)), java.lang.Integer.parseInt(splits(1)), wordsInDoc, wordCounts).asInstanceOf[Data2]
     }
     
-    def testLDA(sc:SparkContext, sqlContext:SQLContext) = {
+    def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String) = {
       val models = sc.parallelize(0 to (LDAData2.WB-1)).map(x => new LDAModel2(x).asInstanceOf[Model2])
 		  val initialData = sc.textFile("/Users/jacobgao/Downloads/wordblock.tbl")
 		  val data = initialData.map(preprocessLDA)
@@ -141,6 +141,14 @@ class Test extends Logging with Serializable {
         m.asInstanceOf[LDAModel2].process()
         d.asInstanceOf[LDAData2].process(m)
       }
+      def test_local_g1(m:Model2): Object = {
+        m.asInstanceOf[LDAModel2].process()
+      }
+      
+      def test_local_g2(del1:Object, d:Data2): Iterable[Delta2] = {
+        val m1 = del1.asInstanceOf[Model2]
+        d.asInstanceOf[LDAData2].process(m1)
+      }
       def test_agg(it:Iterable[Delta2], d:Data2):Output2 = {
         val ret = new LDAOutput2();
         for (d <- it) {
@@ -148,7 +156,14 @@ class Test extends Logging with Serializable {
         }
         ret
       }
-      (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _)).joinNCoGroup(sqlContext, models, data, "naive", false, test_g _)
+      if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+      }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
     }
     
     def preprocessGMM(line: String): Data2 = {
@@ -161,7 +176,7 @@ class Test extends Logging with Serializable {
       new GMMData2(membership, point).asInstanceOf[Data2]
     }
     
-    def testGMM(sc:SparkContext, sqlContext:SQLContext) = {
+    def testGMM(sc:SparkContext, sqlContext:SQLContext, method:String) = {
       val models = sc.parallelize(0 to (GMMData2.C-1)).map(x => new GMMModel2(x).asInstanceOf[Model2])
 		  val initialData = sc.textFile("/Users/jacobgao/Downloads/imputation.tbl")
 		  val data = initialData.map(preprocessGMM)
@@ -177,6 +192,14 @@ class Test extends Logging with Serializable {
         m.asInstanceOf[GMMModel2].process()
         d.asInstanceOf[GMMData2].process(m)
       }
+      def test_local_g1(m:Model2): Object = {
+        m.asInstanceOf[GMMModel2].process()
+      }
+      
+      def test_local_g2(del1:Object, d:Data2): Iterable[Delta2] = {
+        val m1 = del1.asInstanceOf[Model2]
+        d.asInstanceOf[GMMData2].process(m1)
+      }
       def test_agg(it:Iterable[Delta2], d:Data2):Output2 = {
         val ret = new GMMOutput2();
         for (d <- it) {
@@ -184,7 +207,14 @@ class Test extends Logging with Serializable {
         }
         ret
       }
-      (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _)).joinNCoGroup(sqlContext, models, data, "naive", false, test_g _)
+      if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+      }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
     }
 }
 
