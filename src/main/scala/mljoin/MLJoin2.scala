@@ -112,6 +112,80 @@ class Test extends Logging with Serializable {
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
       }
     }
+    
+    def preprocessLDA(line: String): Data2 = {
+      val splits = line.split(" ")
+      val text = splits(2).split(",")
+      val wordsInDoc = Array.ofDim[Int](text.length / 2)
+      val wordCounts = Array.ofDim[Int](text.length / 2)
+      for (i <- 0 until text.length / 2) {
+        wordsInDoc(i) = java.lang.Integer.parseInt(text(2 * i))
+        wordCounts(i) = java.lang.Integer.parseInt(text(2 * i + 1))
+      }
+      new LDAData2(java.lang.Integer.parseInt(splits(0)), java.lang.Integer.parseInt(splits(1)), wordsInDoc, wordCounts).asInstanceOf[Data2]
+    }
+    
+    def testLDA(sc:SparkContext, sqlContext:SQLContext) = {
+      val models = sc.parallelize(0 to (LDAData2.WB-1)).map(x => new LDAModel2(x).asInstanceOf[Model2])
+		  val initialData = sc.textFile("/Users/jacobgao/Downloads/wordblock.tbl")
+		  val data = initialData.map(preprocessLDA)
+      def test_B_i_data_hash(d:Data2) = 1
+      def test_B_i_model_hash(m:Model2) = 1
+      def test_B_i(m:Model2, d:Data2):Boolean = {
+        val m1: LDAModel2 = m.asInstanceOf[LDAModel2]  
+        val d1: LDAData2 = d.asInstanceOf[LDAData2]
+        // Some random criteria
+        if(m1.wordBlockID == d1.wordBlockID) true else false
+      }
+      def test_g(m:Model2)(d:Data2):Iterable[Delta2] = {
+        m.asInstanceOf[LDAModel2].process()
+        d.asInstanceOf[LDAData2].process(m)
+      }
+      def test_agg(it:Iterable[Delta2], d:Data2):Output2 = {
+        val ret = new LDAOutput2();
+        for (d <- it) {
+          ret.addTuple(d.asInstanceOf[LDADelta2])
+        }
+        ret
+      }
+      (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _)).joinNCoGroup(sqlContext, models, data, "naive", false, test_g _)
+    }
+    
+    def preprocessGMM(line: String): Data2 = {
+      val rand = new Random()
+      val splits = line.split(" ")
+      val text = splits(1).split(",")
+      val point = Array.ofDim[Double](text.length)
+      for (i <- 0 until text.length) point(i) = java.lang.Double.parseDouble(text(i))
+      val membership = rand.nextInt(GMMData2.C)
+      new GMMData2(membership, point).asInstanceOf[Data2]
+    }
+    
+    def testGMM(sc:SparkContext, sqlContext:SQLContext) = {
+      val models = sc.parallelize(0 to (GMMData2.C-1)).map(x => new GMMModel2(x).asInstanceOf[Model2])
+		  val initialData = sc.textFile("/Users/jacobgao/Downloads/imputation.tbl")
+		  val data = initialData.map(preprocessGMM)
+      def test_B_i_data_hash(d:Data2) = 1
+      def test_B_i_model_hash(m:Model2) = 1
+      def test_B_i(m:Model2, d:Data2):Boolean = {
+        val m1: GMMModel2 = m.asInstanceOf[GMMModel2]  
+        val d1: GMMData2 = d.asInstanceOf[GMMData2]
+        // Some random criteria
+        if(m1.clusterID == d1.membership) true else false
+      }
+      def test_g(m:Model2)(d:Data2):Iterable[Delta2] = {
+        m.asInstanceOf[GMMModel2].process()
+        d.asInstanceOf[GMMData2].process(m)
+      }
+      def test_agg(it:Iterable[Delta2], d:Data2):Output2 = {
+        val ret = new GMMOutput2();
+        for (d <- it) {
+          ret.addTuple(d.asInstanceOf[GMMDelta2])
+        }
+        ret
+      }
+      (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _)).joinNCoGroup(sqlContext, models, data, "naive", false, test_g _)
+    }
 }
 
 class MLJoin2(
