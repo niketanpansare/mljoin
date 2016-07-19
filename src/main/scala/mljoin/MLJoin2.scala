@@ -114,8 +114,8 @@ class Test extends Logging with Serializable {
     }
     
     def preprocessLDA(line: String): Data2 = {
-      val splits = line.split(" ")
-      val text = splits(2).split(",")
+      val splits = line.split('|')
+      val text = splits(2).drop(1).dropRight(1).split(',')
       val wordsInDoc = Array.ofDim[Int](text.length / 2)
       val wordCounts = Array.ofDim[Int](text.length / 2)
       for (i <- 0 until text.length / 2) {
@@ -127,7 +127,7 @@ class Test extends Logging with Serializable {
     
     def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String) = {
       val models = sc.parallelize(0 to (LDAData2.WB-1)).map(x => new LDAModel2(x).asInstanceOf[Model2])
-		  val initialData = sc.textFile("/Users/jacobgao/Downloads/wordblock.tbl")
+		  val initialData = sc.textFile("wiki_en_bow_wb_100.tbl")
 		  val data = initialData.map(preprocessLDA)
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
@@ -168,8 +168,8 @@ class Test extends Logging with Serializable {
     
     def preprocessGMM(line: String): Data2 = {
       val rand = new Random()
-      val splits = line.split(" ")
-      val text = splits(1).split(",")
+      val splits = line.split('|')
+      val text = splits(1).drop(1).dropRight(1).split(',')
       val point = Array.ofDim[Double](text.length)
       for (i <- 0 until text.length) point(i) = java.lang.Double.parseDouble(text(i))
       val membership = rand.nextInt(GMMData2.C)
@@ -178,7 +178,7 @@ class Test extends Logging with Serializable {
     
     def testGMM(sc:SparkContext, sqlContext:SQLContext, method:String) = {
       val models = sc.parallelize(0 to (GMMData2.C-1)).map(x => new GMMModel2(x).asInstanceOf[Model2])
-		  val initialData = sc.textFile("/Users/jacobgao/Downloads/imputation.tbl")
+		  val initialData = sc.textFile("imputation.tbl")
 		  val data = initialData.map(preprocessGMM)
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
