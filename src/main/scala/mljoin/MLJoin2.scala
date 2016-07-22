@@ -225,11 +225,36 @@ class MLJoin2(
         B_i: (Model2, Data2) => Boolean,
         agg: (Iterable[Delta2], Data2) => Output2) extends Logging with Serializable {
  
-    def serialize(o:Object):Array[Byte] = SerializeUtils.serialize(o)
-    def deserialize(b:Array[Byte]):Object = SerializeUtils.deserialize(b)
-    def serialized_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[Model2], deserialize(d).asInstanceOf[Data2])
-    def serialized_simulated_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[(Model2, Data2 => Iterable[Delta2])]._1, deserialize(d).asInstanceOf[Data2])
-    def serialized_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = B_i(deserialize(m).asInstanceOf[(Model2, Object)]._1, deserialize(d).asInstanceOf[Data2])
+    def serialize(o:Object):Array[Byte] = {
+      val start = System.nanoTime()
+      val ret = SerializeUtils.serialize(o)
+      Statistics.serializeTime.addAndGet(System.nanoTime() - start)
+      ret
+     }
+    def deserialize(b:Array[Byte]):Object = {
+      val start = System.nanoTime()
+      val ret = SerializeUtils.deserialize(b)
+      Statistics.deserializeTime.addAndGet(System.nanoTime() - start)
+      ret
+    }
+    def serialized_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
+      val start = System.nanoTime()
+      val ret = B_i(deserialize(m).asInstanceOf[Model2], deserialize(d).asInstanceOf[Data2])
+      Statistics.serialized_B_i.addAndGet(System.nanoTime() - start)
+      ret
+    }
+    def serialized_simulated_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
+      val start = System.nanoTime()
+      val ret = B_i(deserialize(m).asInstanceOf[(Model2, Data2 => Iterable[Delta2])]._1, deserialize(d).asInstanceOf[Data2])
+      Statistics.serialized_simulated_local_B_i.addAndGet(System.nanoTime() - start)
+      ret
+    }
+    def serialized_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
+      val start = System.nanoTime()
+      val ret = B_i(deserialize(m).asInstanceOf[(Model2, Object)]._1, deserialize(d).asInstanceOf[Data2])
+      Statistics.serialized_local_B_i.addAndGet(System.nanoTime() - start)
+      ret
+    }
     
     def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2]): RDD[Output2] = {
@@ -318,15 +343,20 @@ class MLJoin2(
       sqlContext.createDataFrame(param.map( x => (new CustomRow(x._1,  B_i_model_hash(x._2._1), serialize(x._2))).asInstanceOf[Row] ), modelType)
     }
     
+    var X :RDD[(Long, Data2)] = null
     def seeding(sqlContext:SQLContext, data :RDD[Data2]):Unit = {
-      val X :RDD[(Long, Data2)] = data.zipWithIndex().map(x => (x._2, x._1.asInstanceOf[Data2])).persist(StorageLevel.MEMORY_AND_DISK)
+      val start = System.nanoTime()
+      X = data.zipWithIndex().map(x => (x._2, x._1.asInstanceOf[Data2])).persist(StorageLevel.MEMORY_AND_DISK)
+      
       val count1 = X.count
       val XDF:DataFrame = convertDataToDF(sqlContext, X, B_i_data_hash)             
       XDF.registerTempTable("Data")
+      Statistics.seeding.addAndGet(System.nanoTime() - start)
     }
     
     def prepareParameters(sqlContext:SQLContext, models :RDD[Model2], method:String,
         g: Model2 => Data2 => Iterable[Delta2], g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): Unit = {
+      val start = System.nanoTime()
       if(method.compareToIgnoreCase("naive") == 0) {
         // Step 2: Preparing parameters
         val param :RDD[(Long, Model2)] = models.zipWithIndex().map(x => (x._2, x._1))
@@ -352,11 +382,13 @@ class MLJoin2(
       else {
         throw new RuntimeException("Unsupported method:" + method)
       }
+      Statistics.prepareParameters.addAndGet(System.nanoTime() - start)
     }
     
     def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2],
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
+      val start = System.nanoTime()
       val sqlStr:String = if(applyHash)
                       """
                       SELECT d.id, m.model, d.data
@@ -390,7 +422,10 @@ class MLJoin2(
                            val d:Data2 = x._1._2
                            val id:Long = x._1._1
                            val models:Iterable[Model2] = x._2
-                           models.map(g(_)(d)).map(agg(_, d)).map((id, _))
+                           var start = System.nanoTime()
+                           val ret1 = models.map(g(_)(d)).map(agg(_, d)).map((id, _))
+                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)                     
+                           ret1
                            }  
                          ).values //.sortByKey().values
       }
@@ -410,7 +445,10 @@ class MLJoin2(
                            val d:Data2 = x._1._2
                            val id:Long = x._1._1
                            val models:Iterable[(Model2, Data2 => Iterable[Delta2])] = x._2
-                           models.map(_._2(d)).map(agg(_, d)).map((id, _))
+                           var start = System.nanoTime()
+                           val ret1 = models.map(_._2(d)).map(agg(_, d)).map((id, _))
+                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)
+                           ret1
                          }).values //.sortByKey().values
       }
       else if(method.compareToIgnoreCase("local") == 0) {
@@ -433,12 +471,36 @@ class MLJoin2(
                            val d:Data2 = x._1._2
                            val id:Long = x._1._1
                            val models:Iterable[(Model2, Object)] = x._2
-                           models.map(y => g2(y._2, d)).map(agg(_, d)).map((id, _))
+                           var start = System.nanoTime()
+                           val ret1 = models.map(y => g2(y._2, d)).map(agg(_, d)).map((id, _))
+                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)
+                           ret1
                          }).values //.sortByKey().values
       }
       else {
         throw new RuntimeException("Unsupported method:" + method)
       }
+      Statistics.doSparkSQLJoinNCoGroup.addAndGet(System.nanoTime() - start)
+      
+      
+      val stats = X.map(x => Statistics.get()).filter(_.length > 0).reduce((x, y) => {
+        for(i <- 0 until y.length) {
+          y.add(i, y.get(i) + x.get(i))
+        }
+        y
+      })
+      // ---------------------------------------------------------------------------------------------------
+      System.out.println("The statistics for this run are:")
+      System.out.println("Serialization time: " +  stats.get(0)*(1e-9) + " sec.\n")
+      System.out.println("Deserialization time: " + stats.get(1)*(1e-9) + " sec.\n")
+      System.out.println("serialized_B_i time: " + stats.get(2)*(1e-9) + " sec.\n")
+      System.out.println("serialized_simulated_local_B_i time: " +   stats.get(3)*(1e-9) + " sec.\n")
+      System.out.println("serialized_local_B_i time: " +   stats.get(4)*(1e-9) + " sec.\n")
+      System.out.println("seeding time: " +   stats.get(5)*(1e-9) + " sec.\n")
+      System.out.println("prepareParameters time: " +   stats.get(6)*(1e-9) + " sec.\n")
+      System.out.println("doSparkSQLJoinNCoGroup time: " +   stats.get(7)*(1e-9) + " sec.\n")
+      System.out.println("groupByKeyFlatMapApplication time: " +   stats.get(8)*(1e-9) + " sec.\n")
+      // ---------------------------------------------------------------------------------------------------
       ret
     }
     
