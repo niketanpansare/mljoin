@@ -3,6 +3,7 @@ package mljoin
 import java.util.concurrent.atomic.AtomicLong
 import java.util.ArrayList
 import java.util.concurrent.atomic.AtomicBoolean
+import org.apache.spark.rdd._
 
 object Statistics {
   val serializeTime = new AtomicLong
@@ -46,4 +47,26 @@ object Statistics {
     }
     ret
   }
+  
+  def printStatistics(X:RDD[Data2]): Unit = {
+      val stats = X.map(x => Statistics.get()).filter(_.size() > 0).reduce((x, y) => {
+        val ret11 = new ArrayList[Long]
+        for(i <- 0 until y.size()) {
+          ret11.add(y.get(i) + x.get(i))
+        }
+        ret11
+      })
+      // ---------------------------------------------------------------------------------------------------
+      System.out.println("The statistics for this run are:")
+      System.out.print("Serialization time: " +  stats.get(0)*(1e-9) + " sec.\n")
+      System.out.print("Deserialization time: " + stats.get(1)*(1e-9) + " sec.\n")
+      System.out.print("serialized_B_i time: " + stats.get(2)*(1e-9) + " sec.\n")
+      System.out.print("serialized_simulated_local_B_i time: " +   stats.get(3)*(1e-9) + " sec.\n")
+      System.out.print("serialized_local_B_i time: " +   stats.get(4)*(1e-9) + " sec.\n")
+      System.out.print("seeding time: " +   stats.get(5)*(1e-9) + " sec.\n")
+      System.out.print("prepareParameters time: " +   stats.get(6)*(1e-9) + " sec.\n")
+      System.out.print("doSparkSQLJoinNCoGroup time: " +   stats.get(7)*(1e-9) + " sec.\n")
+      System.out.print("groupByKeyFlatMapApplication time: " +   stats.get(8)*(1e-9) + " sec.\n")
+      // ---------------------------------------------------------------------------------------------------
+    }
 }

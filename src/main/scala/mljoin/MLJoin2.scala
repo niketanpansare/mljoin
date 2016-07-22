@@ -53,13 +53,17 @@ case class TestData2(val1: Int, val2: Int) extends Data2
 case class TestDelta2(val1: Int, val2: Int) extends Delta2
 case class TestOutput2(val1: Int, val2: Int) extends Output2
 
-// val res = (new mljoin.Test).test1(sc, sqlContext, "local")
+// val t = new mljoin.Test
+// val data = t.generateSampleData(sc)
+// val res = t.test1(sc, sqlContext, "local", data)
 // res.take(3)
+// mljoin.Statistics.printStatistics(data)
 // should output: Array[mljoin.Output2] = Array(TestOutput2(-1987944601,2017986180), TestOutput2(-2026790272,1979140509), TestOutput2(-1848329172,-2137365687))
 class Test extends Logging with Serializable {
-    def test1(sc:SparkContext, sqlContext:SQLContext, method:String) = {
+  
+    def generateSampleData(sc:SparkContext): RDD[Data2] = sc.parallelize(1 to 10).map(x => { val r = new java.util.Random(); new TestData2(r.nextInt, r.nextInt).asInstanceOf[Data2]}) 
+    def test1(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
       val models = sc.parallelize(1 to 10).map(x => { val r = new java.util.Random(); new TestModel2(r.nextInt, r.nextInt).asInstanceOf[Model2]})
-      val data = sc.parallelize(1 to 10).map(x => { val r = new java.util.Random(); new TestData2(r.nextInt, r.nextInt).asInstanceOf[Data2]})
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
       def test_B_i(m:Model2, d:Data2):Boolean = {
@@ -343,10 +347,9 @@ class MLJoin2(
       sqlContext.createDataFrame(param.map( x => (new CustomRow(x._1,  B_i_model_hash(x._2._1), serialize(x._2))).asInstanceOf[Row] ), modelType)
     }
     
-    var X :RDD[(Long, Data2)] = null
     def seeding(sqlContext:SQLContext, data :RDD[Data2]):Unit = {
       val start = System.nanoTime()
-      X = data.zipWithIndex().map(x => (x._2, x._1.asInstanceOf[Data2])).persist(StorageLevel.MEMORY_AND_DISK)
+      val X :RDD[(Long, Data2)] = data.zipWithIndex().map(x => (x._2, x._1.asInstanceOf[Data2])).persist(StorageLevel.MEMORY_AND_DISK)
       
       val count1 = X.count
       val XDF:DataFrame = convertDataToDF(sqlContext, X, B_i_data_hash)             
@@ -481,26 +484,6 @@ class MLJoin2(
         throw new RuntimeException("Unsupported method:" + method)
       }
       Statistics.doSparkSQLJoinNCoGroup.addAndGet(System.nanoTime() - start)
-      
-      
-      val stats = X.map(x => Statistics.get()).filter(_.length > 0).reduce((x, y) => {
-        for(i <- 0 until y.length) {
-          y.add(i, y.get(i) + x.get(i))
-        }
-        y
-      })
-      // ---------------------------------------------------------------------------------------------------
-      System.out.println("The statistics for this run are:")
-      System.out.println("Serialization time: " +  stats.get(0)*(1e-9) + " sec.\n")
-      System.out.println("Deserialization time: " + stats.get(1)*(1e-9) + " sec.\n")
-      System.out.println("serialized_B_i time: " + stats.get(2)*(1e-9) + " sec.\n")
-      System.out.println("serialized_simulated_local_B_i time: " +   stats.get(3)*(1e-9) + " sec.\n")
-      System.out.println("serialized_local_B_i time: " +   stats.get(4)*(1e-9) + " sec.\n")
-      System.out.println("seeding time: " +   stats.get(5)*(1e-9) + " sec.\n")
-      System.out.println("prepareParameters time: " +   stats.get(6)*(1e-9) + " sec.\n")
-      System.out.println("doSparkSQLJoinNCoGroup time: " +   stats.get(7)*(1e-9) + " sec.\n")
-      System.out.println("groupByKeyFlatMapApplication time: " +   stats.get(8)*(1e-9) + " sec.\n")
-      // ---------------------------------------------------------------------------------------------------
       ret
     }
     
