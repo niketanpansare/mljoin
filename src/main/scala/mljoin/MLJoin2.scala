@@ -129,10 +129,9 @@ class Test extends Logging with Serializable {
       new LDAData2(java.lang.Integer.parseInt(splits(0)), java.lang.Integer.parseInt(splits(1)), wordsInDoc, wordCounts).asInstanceOf[Data2]
     }
     
-    def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String) = {
+    def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String, initialData:String) = {
       val models = sc.parallelize(0 to (LDAData2.WB-1)).map(x => new LDAModel2(x).asInstanceOf[Model2])
-		  val initialData = sc.textFile("wiki_en_bow_wb_100.tbl")
-		  val data = initialData.map(preprocessLDA)
+		  val data = sc.textFile(initialData).map(preprocessLDA)
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
       def test_B_i(m:Model2, d:Data2):Boolean = {
@@ -180,10 +179,9 @@ class Test extends Logging with Serializable {
       new GMMData2(membership, point).asInstanceOf[Data2]
     }
     
-    def testGMM(sc:SparkContext, sqlContext:SQLContext, method:String) = {
+    def testGMM(sc:SparkContext, sqlContext:SQLContext, method:String, initialData:String) = {
       val models = sc.parallelize(0 to (GMMData2.C-1)).map(x => new GMMModel2(x).asInstanceOf[Model2])
-		  val initialData = sc.textFile("imputation.tbl")
-		  val data = initialData.map(preprocessGMM)
+		  val data = sc.textFile(initialData).map(preprocessGMM)
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
       def test_B_i(m:Model2, d:Data2):Boolean = {
@@ -220,6 +218,52 @@ class Test extends Logging with Serializable {
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
       }
     }
+    
+    def preprocessLR(line: String): Data2 = {
+      val splits = line.split('|')
+      val text = splits(1).drop(1).dropRight(1).split(',')
+      val point = Array.ofDim[Double](text.length)
+      for (i <- 0 until text.length) point(i) = java.lang.Double.parseDouble(text(i))
+      new LRData2(java.lang.Integer.parseInt(splits(0)), point, java.lang.Double.parseDouble(splits(2))).asInstanceOf[Data2]
+    }
+    
+    def testLR(sc:SparkContext, sqlContext:SQLContext, method:String, initialData:String) = {
+      val models = sc.parallelize(0 to 0).map(x => new LRModel2().asInstanceOf[Model2])
+		  val data = sc.textFile(initialData).map(preprocessLR)
+      def test_B_i_data_hash(d:Data2) = 1
+      def test_B_i_model_hash(m:Model2) = 1
+      def test_B_i(m:Model2, d:Data2):Boolean = {
+        true
+      }
+      def test_g(m:Model2)(d:Data2):Iterable[Delta2] = {
+        m.asInstanceOf[LRModel2].process()
+        d.asInstanceOf[LRData2].process(m)
+      }
+      def test_local_g1(m:Model2): Object = {
+        m.asInstanceOf[LRModel2].process()
+      }
+      
+      def test_local_g2(del1:Object, d:Data2): Iterable[Delta2] = {
+        val m1 = del1.asInstanceOf[Model2]
+        d.asInstanceOf[LRData2].process(m1)
+      }
+      def test_agg(it:Iterable[Delta2], d:Data2):Output2 = {
+        val ret = new LROutput2();
+        for (d <- it) {
+          ret.addTuple(d.asInstanceOf[LRDelta2])
+        }
+        ret
+      }
+      if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+      }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+    }
+    
 }
 
 class MLJoin2(
