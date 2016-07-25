@@ -174,9 +174,10 @@ public class GMMData implements Data {
 	public static void main(String [] args) {
 		SparkConf conf = new SparkConf().setMaster("local[*]").setAppName("My local integration test app");
 		SparkContext sc = new SparkContext(conf);
-		testGlobal(sc);
+//		testGlobal(sc);
 	}
 	
+	/***
 	public static RDD<Output> testGlobal(SparkContext sc) {
 		ArrayList<Integer> clusterIDs = new ArrayList<Integer>();
 		for (int i = 0; i < C; i++)
@@ -336,5 +337,6 @@ public class GMMData implements Data {
 		
 		return (new MLJoin()).local(sc, models.rdd(), data.rdd(), listenerPortNumber, true);
 	}
+	*/
 
 }

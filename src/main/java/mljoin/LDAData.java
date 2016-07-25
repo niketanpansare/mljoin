@@ -3,6 +3,7 @@ package mljoin;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map.Entry;
 
 import mljoin.LDAOutput.LDATuple;
 
@@ -86,6 +87,7 @@ public class LDAData implements Data {
 		// testGlobal(sc);
 	}
 	
+	/***
 	public static RDD<Output> testGlobal(SparkContext sc) {
 		ArrayList<Integer> wordBlockIDs = new ArrayList<Integer>();
 		for (int i = 0; i < WB; i++)
@@ -123,7 +125,7 @@ public class LDAData implements Data {
 				            	int topicID = tuple._1;
 				            	HashMap<Integer, double[]> topicProbs = StatUtils.dirichletConjugateSplitIntoWordBlocks(tuple._2, 1.0, WB, WBS);
 								ArrayList<Tuple2<Integer, Tuple2<Integer, double[]>>> result = new ArrayList<>();
-								for (HashMap.Entry<Integer, double[]> entry : topicProbs.entrySet()) {
+								for (Entry<Integer, double[]> entry : topicProbs.entrySet()) {
 									Tuple2<Integer, double[]> newtuple = new Tuple2<Integer, double[]>(topicID, entry.getValue());
 									result.add(new Tuple2<Integer, Tuple2<Integer, double[]>>(entry.getKey(), newtuple));
 								}
@@ -133,5 +135,6 @@ public class LDAData implements Data {
 		        x -> ((LDAModel) x._2._2).setTopicRow(x._2._1._1, x._2._1._2)).distinct().collect();
 		return output;
 	}
+	*/
 	
 }
