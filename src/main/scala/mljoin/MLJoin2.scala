@@ -129,9 +129,9 @@ class Test extends Logging with Serializable {
       new LDAData2(java.lang.Integer.parseInt(splits(0)), java.lang.Integer.parseInt(splits(1)), wordsInDoc, wordCounts).asInstanceOf[Data2]
     }
     
-    def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String, initialData:String) = {
+    // val data = sc.textFile(initialData).map(t.preprocessLDA)
+    def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
       val models = sc.parallelize(0 to (LDAData2.WB-1)).map(x => new LDAModel2(x).asInstanceOf[Model2])
-		  val data = sc.textFile(initialData).map(preprocessLDA)
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
       def test_B_i(m:Model2, d:Data2):Boolean = {
@@ -179,9 +179,9 @@ class Test extends Logging with Serializable {
       new GMMData2(membership, point).asInstanceOf[Data2]
     }
     
-    def testGMM(sc:SparkContext, sqlContext:SQLContext, method:String, initialData:String) = {
+    // val data = sc.textFile(initialData).map(t.preprocessGMM)
+    def testGMM(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
       val models = sc.parallelize(0 to (GMMData2.C-1)).map(x => new GMMModel2(x).asInstanceOf[Model2])
-		  val data = sc.textFile(initialData).map(preprocessGMM)
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
       def test_B_i(m:Model2, d:Data2):Boolean = {
@@ -227,9 +227,9 @@ class Test extends Logging with Serializable {
       new LRData2(java.lang.Integer.parseInt(splits(0)), point, java.lang.Double.parseDouble(splits(2))).asInstanceOf[Data2]
     }
     
-    def testLR(sc:SparkContext, sqlContext:SQLContext, method:String, initialData:String) = {
+		// val data = sc.textFile(initialData).map(t.preprocessLR)
+    def testLR(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
       val models = sc.parallelize(0 to 0).map(x => new LRModel2().asInstanceOf[Model2])
-		  val data = sc.textFile(initialData).map(preprocessLR)
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
       def test_B_i(m:Model2, d:Data2):Boolean = {
