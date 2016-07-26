@@ -18,6 +18,7 @@ public class LRModel2 implements Model2 {
 	public Model2 process() {
 		// TODO: Jacob
 		// nothing to do here for LR
+		// Statistics.modelProcessTime().addAndGet(System.nanoTime()-start);
 		return this;
 	}
 	

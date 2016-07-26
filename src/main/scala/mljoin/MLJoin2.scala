@@ -131,6 +131,7 @@ class Test extends Logging with Serializable {
     
     // val data = sc.textFile(initialData).map(t.preprocessLDA)
     def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
+      val start = System.nanoTime()
       val models = sc.parallelize(0 to (LDAData2.WB-1)).map(x => new LDAModel2(x).asInstanceOf[Model2])
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
@@ -159,7 +160,7 @@ class Test extends Logging with Serializable {
         }
         ret
       }
-      if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+      val ret = if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
@@ -167,6 +168,11 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
       }
+      
+      val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
+      ret1.count
+      System.out.println("Total execution time for testLDA(" + method + "):" + (System.nanoTime() - start)*(1e-9) + " sec.\n")
+      ret1
     }
     
     def preprocessGMM(line: String): Data2 = {
@@ -181,6 +187,8 @@ class Test extends Logging with Serializable {
     
     // val data = sc.textFile(initialData).map(t.preprocessGMM)
     def testGMM(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
+      val start = System.nanoTime()
+      
       val models = sc.parallelize(0 to (GMMData2.C-1)).map(x => new GMMModel2(x).asInstanceOf[Model2])
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
@@ -209,7 +217,7 @@ class Test extends Logging with Serializable {
         }
         ret
       }
-      if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+      val ret = if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
@@ -217,6 +225,10 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
       }
+      val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
+      ret1.count
+      System.out.println("Total execution time for testGMM(" + method + "):" + (System.nanoTime() - start)*(1e-9) + " sec.\n")
+      ret1
     }
     
     def preprocessLR(line: String): Data2 = {
@@ -229,6 +241,7 @@ class Test extends Logging with Serializable {
     
 		// val data = sc.textFile(initialData).map(t.preprocessLR)
     def testLR(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
+      val start = System.nanoTime()
       val models = sc.parallelize(0 to 0).map(x => new LRModel2().asInstanceOf[Model2])
       def test_B_i_data_hash(d:Data2) = 1
       def test_B_i_model_hash(m:Model2) = 1
@@ -254,7 +267,7 @@ class Test extends Logging with Serializable {
         }
         ret
       }
-      if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+      val ret = if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
@@ -262,6 +275,11 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
       }
+      
+      val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
+      ret1.count
+      System.out.println("Total execution time for testLR(" + method + "):" + (System.nanoTime() - start)*(1e-9) + " sec.\n")
+      ret1
     }
     
 }
@@ -277,12 +295,14 @@ class MLJoin2(
       val start = System.nanoTime()
       val ret = SerializeUtils.serialize(o)
       Statistics.serializeTime.addAndGet(System.nanoTime() - start)
+      Statistics.numSerialization.addAndGet(1)
       ret
      }
     def deserialize(b:Array[Byte]):Object = {
       val start = System.nanoTime()
       val ret = SerializeUtils.deserialize(b)
       Statistics.deserializeTime.addAndGet(System.nanoTime() - start)
+      Statistics.numDeSerialization.addAndGet(1)
       ret
     }
     def serialized_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {

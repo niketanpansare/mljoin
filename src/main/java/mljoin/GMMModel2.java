@@ -56,9 +56,11 @@ public class GMMModel2 implements Model2 {
 	public Model2 process() {
 		// TODO: Jacob
 		// inverse cov and store in invCov
+		long start = System.nanoTime();
 		LUDecomposition covDecomposed = new LUDecomposition(MatrixUtils.createRealMatrix(cov));
 		invCov = covDecomposed.getSolver().getInverse().getData();
 		determinant = covDecomposed.getDeterminant();
+		Statistics.modelProcessTime().addAndGet(System.nanoTime()-start);
 		return this;
 	}
 

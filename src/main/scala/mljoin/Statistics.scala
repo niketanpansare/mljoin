@@ -15,7 +15,10 @@ object Statistics {
   val prepareParameters = new AtomicLong
   val doSparkSQLJoinNCoGroup = new AtomicLong
   val groupByKeyFlatMapApplication = new AtomicLong
-  
+  val modelProcessTime = new AtomicLong
+  val dataProcessTime = new AtomicLong
+  val numSerialization = new AtomicLong
+  val numDeSerialization = new AtomicLong
   
   // Assumption no parallel joinNCoGroup
   @volatile var isFetched = false
@@ -34,6 +37,10 @@ object Statistics {
         ret.add(prepareParameters.get)
         ret.add(doSparkSQLJoinNCoGroup.get)
         ret.add(groupByKeyFlatMapApplication.get)
+        ret.add(modelProcessTime.get)
+        ret.add(dataProcessTime.get)
+        ret.add(numSerialization.get)
+        ret.add(numDeSerialization.get)
         serializeTime.set(0)
         deserializeTime.set(0)
         serialized_B_i.set(0)
@@ -43,6 +50,10 @@ object Statistics {
         prepareParameters.set(0)
         doSparkSQLJoinNCoGroup.set(0)
         groupByKeyFlatMapApplication.set(0)
+        modelProcessTime.set(0)
+        dataProcessTime.set(0)
+        numSerialization.set(0)
+        numDeSerialization.set(0)
       }
     }
     ret
@@ -67,6 +78,10 @@ object Statistics {
       System.out.print("prepareParameters time: " +   stats.get(6)*(1e-9) + " sec.\n")
       System.out.print("doSparkSQLJoinNCoGroup time: " +   stats.get(7)*(1e-9) + " sec.\n")
       System.out.print("groupByKeyFlatMapApplication time: " +   stats.get(8)*(1e-9) + " sec.\n")
+      System.out.print("Model processing time: " +   stats.get(9)*(1e-9) + " sec.\n")
+      System.out.print("Data processing time: " +   stats.get(10)*(1e-9) + " sec.\n")
+      System.out.print("Serialization count: " +   stats.get(11) + " \n")
+      System.out.print("Deserialization count: " +   stats.get(12) + " \n")
       // ---------------------------------------------------------------------------------------------------
     }
 }

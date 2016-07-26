@@ -33,6 +33,7 @@ public class LDAData2 implements Data2 {
 	public ArrayList<Delta2> process(Model2 m) {
 		// TODO: Jacob
 		// update topicsOfWords based on m
+		long start  = System.nanoTime();
 		ArrayList<Delta2> tuples = multinomialWordTopic(wordsInDoc, wordCounts, docProbs, ((LDAModel2)m).getTopicProbs());
 		// update docProbs based on topicsOfWords but no need to output it
 		int sumByTopic[] = new int[T];
@@ -41,6 +42,7 @@ public class LDAData2 implements Data2 {
 		}
 		StatUtils.dirichletConjugate(docProbs, sumByTopic, 1.0);
 		// output topicsOfWords
+		Statistics.dataProcessTime().addAndGet(System.nanoTime()-start);
 		return tuples;
 	}
 	

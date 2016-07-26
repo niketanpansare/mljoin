@@ -38,6 +38,7 @@ public class GMMData2 implements Data2 {
 
 	public ArrayList<Delta2> process(Model2 m) {
 		// TODO: Jacob
+		long start = System.nanoTime();
 		double[] mean = ((GMMModel2)m).getMean();
 		double[][] cov = ((GMMModel2)m).getCov();
 		double[][] invCov = ((GMMModel2)m).getInvCov();
@@ -45,6 +46,7 @@ public class GMMData2 implements Data2 {
 		imputeMissingData(data, missing, mean, cov, invCov);
 		ArrayList<Delta2> tuples = new ArrayList<Delta2>();
 		tuples.add(new GMMDelta2(data));
+		Statistics.dataProcessTime().addAndGet(System.nanoTime()-start);
 		return tuples;
 	}
 	

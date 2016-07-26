@@ -25,9 +25,11 @@ public class LRData2 implements Data2 {
 
 	public ArrayList<Delta2> process(Model2 m) {
 		// TODO: Jacob
+		long start = System.nanoTime();
 		double[] gradient = calculateGradient(x, y, ((LRModel2)m).getTheta());
 		ArrayList<Delta2> tuples = new ArrayList<Delta2>();
 		tuples.add(new LRDelta2(gradient));
+		Statistics.dataProcessTime().addAndGet(System.nanoTime()-start);
 		return tuples;
 	}
 	
