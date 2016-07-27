@@ -453,7 +453,7 @@ class MLJoin2(
         val paramDF:DataFrame = convertSimulatedLocalModelToDF(sqlContext, param, B_i_model_hash)
         paramDF.registerTempTable("Model")
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         // Step 2: Preparing parameters
         val param :RDD[(Long, (Model2, Object))] = models
             .zipWithIndex()
