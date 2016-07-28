@@ -17,8 +17,8 @@ import java.util.List;
 import java.util.Random;
 
 public class GMMData2 implements Data2 {
-	public static int D = 2; 		// total number of dimensions
-	public static int C = 3;		// total number of clusters
+	public static int D = 100; 		// total number of dimensions
+	public static int C = 10;		// total number of clusters
 	
 	private static final long serialVersionUID = -8280023097269439963L;
 	

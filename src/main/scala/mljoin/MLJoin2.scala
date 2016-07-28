@@ -111,9 +111,13 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
     }
     
@@ -138,7 +142,6 @@ class Test extends Logging with Serializable {
       def test_B_i(m:Model2, d:Data2):Boolean = {
         val m1: LDAModel2 = m.asInstanceOf[LDAModel2]  
         val d1: LDAData2 = d.asInstanceOf[LDAData2]
-        // Some random criteria
         if(m1.wordBlockID == d1.wordBlockID) true else false
       }
       def test_g(m:Model2)(d:Data2):Iterable[Delta2] = {
@@ -164,9 +167,13 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       
       val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
@@ -195,7 +202,6 @@ class Test extends Logging with Serializable {
       def test_B_i(m:Model2, d:Data2):Boolean = {
         val m1: GMMModel2 = m.asInstanceOf[GMMModel2]  
         val d1: GMMData2 = d.asInstanceOf[GMMData2]
-        // Some random criteria
         if(m1.clusterID == d1.membership) true else false
       }
       def test_g(m:Model2)(d:Data2):Iterable[Delta2] = {
@@ -221,10 +227,15 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
       }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+      }
+      
       val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
       ret1.count
       System.out.println("Total execution time for testGMM(" + method + "):" + (System.nanoTime() - start)*(1e-9) + " sec.\n")
@@ -271,9 +282,13 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
         .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+      else {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, test_B_i _, test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       
       val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
@@ -357,7 +372,7 @@ class MLJoin2(
       // Step 2: Preparing parameters
       prepareParameters(sqlContext, models, method, null, g1, g2)
       
-      if(method.compareToIgnoreCase("local") == 0) {
+      if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         sqlContext.udf.register("B_i", serialized_local_B_i _)
       }
       else if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
@@ -438,7 +453,7 @@ class MLJoin2(
         val paramDF:DataFrame = convertSimulatedLocalModelToDF(sqlContext, param, B_i_model_hash)
         paramDF.registerTempTable("Model")
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         // Step 2: Preparing parameters
         val param :RDD[(Long, (Model2, Object))] = models
             .zipWithIndex()
@@ -518,7 +533,7 @@ class MLJoin2(
                            ret1
                          }).values //.sortByKey().values
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         
         if(g2 == null) {
           throw new RuntimeException("The function g2 cannot be null");
