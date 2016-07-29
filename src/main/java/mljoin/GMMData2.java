@@ -60,7 +60,7 @@ public class GMMData2 implements Data2 {
 	    }
 	    int dO = D - dR;
 	    
-	    if (dR > 0) {
+	    if (dR > 0 && dO > 0) {
     	  int random[] = new int[dR];
     	  int observed[] = new int[dO];
     	  int indexOfRandom = 0, indexOfObserved = 0;

@@ -137,8 +137,8 @@ class Test extends Logging with Serializable {
     def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
       val start = System.nanoTime()
       val models = sc.parallelize(0 to (LDAData2.WB-1)).map(x => new LDAModel2(x).asInstanceOf[Model2])
-      def test_B_i_data_hash(d:Data2) = 1
-      def test_B_i_model_hash(m:Model2) = 1
+      def test_B_i_data_hash(d:Data2) = d.asInstanceOf[LDAData2].wordBlockID
+      def test_B_i_model_hash(m:Model2) = m.asInstanceOf[LDAModel2].wordBlockID
       def test_B_i(m:Model2, d:Data2):Boolean = {
         val m1: LDAModel2 = m.asInstanceOf[LDAModel2]  
         val d1: LDAData2 = d.asInstanceOf[LDAData2]
@@ -197,8 +197,8 @@ class Test extends Logging with Serializable {
       val start = System.nanoTime()
       
       val models = sc.parallelize(0 to (GMMData2.C-1)).map(x => new GMMModel2(x).asInstanceOf[Model2])
-      def test_B_i_data_hash(d:Data2) = 1
-      def test_B_i_model_hash(m:Model2) = 1
+      def test_B_i_data_hash(d:Data2) = d.asInstanceOf[GMMData2].membership
+      def test_B_i_model_hash(m:Model2) = m.asInstanceOf[GMMModel2].clusterID
       def test_B_i(m:Model2, d:Data2):Boolean = {
         val m1: GMMModel2 = m.asInstanceOf[GMMModel2]  
         val d1: GMMData2 = d.asInstanceOf[GMMData2]
