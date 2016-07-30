@@ -467,6 +467,16 @@ class MLJoin2(
       Statistics.prepareParameters.addAndGet(System.nanoTime() - start)
     }
     
+    def performAggregation(in:RDD[((Long, Data2), Iterable[Delta2])]): RDD[Output2] = {
+      in.reduceByKey((it1, it2) => it1 ++ it2)
+                    .map(x => {
+                      val id:Long = x._1._1
+                      val d:Data2 = x._1._2
+                      val itDelta:Iterable[Delta2] = x._2 
+                      (id, agg(itDelta, d))
+                    }).values //.sortByKey().values
+    }
+    
     def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2],
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
@@ -498,15 +508,14 @@ class MLJoin2(
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
-        ret = temp.map(x =>
+        ret = performAggregation(temp.map(x =>
                     {
                        val id:Long = x._1
                        val d:Data2 = x._3
                        val model:Model2 = x._2
-                       val itDelta:Iterable[Delta2] = g(model)(d) 
-                       (id, agg(itDelta, d))
-                    })
-                     .values //.sortByKey().values
+                       val itDelta:Iterable[Delta2] = g(model)(d)
+                       ((id, d), itDelta)
+                    }))
 //        ret = temp.map(x => ((x._1, x._3), x._2))
 //                         .groupByKey()
 //                         .flatMap(x => {
@@ -530,14 +539,14 @@ class MLJoin2(
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
-        ret = temp.map(x => {
+        ret = performAggregation(temp.map(x => {
               val id:Long = x._1
               val d:Data2 = x._3
               val model:Model2 = x._2._1
               val appliedFn: (Data2 => Iterable[Delta2]) = x._2._2
               val itDelta:Iterable[Delta2] = appliedFn(d)
-              (id, agg(itDelta, d))
-            }).values    //.sortByKey().values
+              ((id, d), itDelta)
+            }))
 //        ret = temp.map(x => ((x._1, x._3), x._2))
 //                         .groupByKey()
 //                         .flatMap(x => {
@@ -564,15 +573,15 @@ class MLJoin2(
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
-        ret = temp.map( x =>
+        ret = performAggregation(temp.map( x =>
                       {
                         val id:Long = x._1
                         val model: Model2 = x._2._1
                         val appliedModel: Object = x._2._2
                         val d:Data2 = x._3
                         val itDelta:Iterable[Delta2] = g2(appliedModel, d)
-                        (id, agg(itDelta, d))
-                      }).values //.sortByKey().values
+                        ((id, d), itDelta)
+                      }))
 //        ret = temp.map(x => ((x._1, x._3), x._2))
 //                         .groupByKey()
 //                         .flatMap(x => {
