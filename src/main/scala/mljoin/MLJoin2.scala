@@ -498,18 +498,27 @@ class MLJoin2(
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
-        ret = temp.map(x => ((x._1, x._3), x._2))
-                         .groupByKey()
-                         .flatMap(x => {
-                           val d:Data2 = x._1._2
-                           val id:Long = x._1._1
-                           val models:Iterable[Model2] = x._2
-                           var start = System.nanoTime()
-                           val ret1 = models.map(g(_)(d)).map(agg(_, d)).map((id, _))
-                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)                     
-                           ret1
-                           }  
-                         ).values //.sortByKey().values
+        ret = temp.map(x =>
+                    {
+                       val id:Long = x._1
+                       val d:Data2 = x._3
+                       val model:Model2 = x._2
+                       val itDelta:Iterable[Delta2] = g(model)(d) 
+                       (id, agg(itDelta, d))
+                    })
+                     .values //.sortByKey().values
+//        ret = temp.map(x => ((x._1, x._3), x._2))
+//                         .groupByKey()
+//                         .flatMap(x => {
+//                           val d:Data2 = x._1._2
+//                           val id:Long = x._1._1
+//                           val models:Iterable[Model2] = x._2
+//                           var start = System.nanoTime()
+//                           val ret1 = models.map(g(_)(d)).map(agg(_, d)).map((id, _))
+//                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)                     
+//                           ret1
+//                           }  
+//                         ).values //.sortByKey().values
       }
       else if(method.compareToIgnoreCase("simulated-local") == 0) {
         // Join
@@ -521,17 +530,25 @@ class MLJoin2(
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
-        ret = temp.map(x => ((x._1, x._3), x._2))
-                         .groupByKey()
-                         .flatMap(x => {
-                           val d:Data2 = x._1._2
-                           val id:Long = x._1._1
-                           val models:Iterable[(Model2, Data2 => Iterable[Delta2])] = x._2
-                           var start = System.nanoTime()
-                           val ret1 = models.map(_._2(d)).map(agg(_, d)).map((id, _))
-                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)
-                           ret1
-                         }).values //.sortByKey().values
+        ret = temp.map(x => {
+              val id:Long = x._1
+              val d:Data2 = x._3
+              val model:Model2 = x._2._1
+              val appliedFn: (Data2 => Iterable[Delta2]) = x._2._2
+              val itDelta:Iterable[Delta2] = appliedFn(d)
+              (id, agg(itDelta, d))
+            }).values    //.sortByKey().values
+//        ret = temp.map(x => ((x._1, x._3), x._2))
+//                         .groupByKey()
+//                         .flatMap(x => {
+//                           val d:Data2 = x._1._2
+//                           val id:Long = x._1._1
+//                           val models:Iterable[(Model2, Data2 => Iterable[Delta2])] = x._2
+//                           var start = System.nanoTime()
+//                           val ret1 = models.map(_._2(d)).map(agg(_, d)).map((id, _))
+//                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)
+//                           ret1
+//                         }).values //.sortByKey().values
       }
       else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         
@@ -547,17 +564,26 @@ class MLJoin2(
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
-        ret = temp.map(x => ((x._1, x._3), x._2))
-                         .groupByKey()
-                         .flatMap(x => {
-                           val d:Data2 = x._1._2
-                           val id:Long = x._1._1
-                           val models:Iterable[(Model2, Object)] = x._2
-                           var start = System.nanoTime()
-                           val ret1 = models.map(y => g2(y._2, d)).map(agg(_, d)).map((id, _))
-                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)
-                           ret1
-                         }).values //.sortByKey().values
+        ret = temp.map( x =>
+                      {
+                        val id:Long = x._1
+                        val model: Model2 = x._2._1
+                        val appliedModel: Object = x._2._2
+                        val d:Data2 = x._3
+                        val itDelta:Iterable[Delta2] = g2(appliedModel, d)
+                        (id, agg(itDelta, d))
+                      }).values //.sortByKey().values
+//        ret = temp.map(x => ((x._1, x._3), x._2))
+//                         .groupByKey()
+//                         .flatMap(x => {
+//                           val d:Data2 = x._1._2
+//                           val id:Long = x._1._1
+//                           val models:Iterable[(Model2, Object)] = x._2
+//                           var start = System.nanoTime()
+//                           val ret1 = models.map(y => g2(y._2, d)).map(agg(_, d)).map((id, _))
+//                           Statistics.groupByKeyFlatMapApplication.addAndGet(System.nanoTime() - start)
+//                           ret1
+//                         }).values //.sortByKey().values
       }
       else {
         throw new RuntimeException("Unsupported method:" + method)
