@@ -514,12 +514,25 @@ class MLJoin2(
                     }).values //.sortByKey().values
     }
     
+    val useDummyB_i = true
+    def dummy_B_i(m: Array[Byte], d:Array[Byte]): Boolean = true
+    
     def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, 
         // applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2],
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
       val start = System.nanoTime()
+      
+      sqlContext.udf.register("dummy_B_i", dummy_B_i _)
       val sqlStr:String = 
+              if(useDummyB_i)
+                      """
+                      SELECT d.id, m.model, d.data
+                      FROM Model m, Data d
+                      WHERE m.hash = d.hash
+                      AND dummy_B_i(m.model, d.data)
+                      """
+              else
                       """
                       SELECT d.id, m.model, d.data
                       FROM Model m, Data d
