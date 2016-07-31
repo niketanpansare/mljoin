@@ -110,15 +110,21 @@ class Test extends Logging with Serializable {
       }
       if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-            // test_B_i _, 
+             test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-            // test_B_i _, 
+             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+      else if(method.compareToIgnoreCase("global") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
+             test_B_i _, 
+            test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
@@ -169,15 +175,21 @@ class Test extends Logging with Serializable {
       }
       val ret = if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
+            test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
+            test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+      else if(method.compareToIgnoreCase("global") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
+            test_B_i _, 
+            test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
@@ -232,15 +244,21 @@ class Test extends Logging with Serializable {
       }
       val ret = if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
+            test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
+            test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+      else if(method.compareToIgnoreCase("global") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
+            test_B_i _, 
+            test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
@@ -290,15 +308,21 @@ class Test extends Logging with Serializable {
       }
       val ret = if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
+            test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
+            test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+      }
+      else if(method.compareToIgnoreCase("global") == 0) {
+        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
+            test_B_i _, 
+            test_agg _))
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
@@ -316,7 +340,7 @@ class MLJoin2(
         // For natural join: 
         B_i_model_hash: Model2 => Long,
         B_i_data_hash: Data2 => Long,
-        // B_i: (Model2, Data2) => Boolean,
+        B_i: (Model2, Data2) => Boolean,
         agg: (Iterable[Delta2], Data2) => Output2) extends Logging with Serializable {
  
     def serialize(o:Object):Array[Byte] = {
@@ -333,27 +357,27 @@ class MLJoin2(
       Statistics.numDeSerialization.addAndGet(1)
       ret
     }
-//    def serialized_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
-//      val start = System.nanoTime()
-//      val ret = B_i(deserialize(m).asInstanceOf[Model2], deserialize(d).asInstanceOf[Data2])
-//      Statistics.serialized_B_i.addAndGet(System.nanoTime() - start)
-//      ret
-//    }
-//    def serialized_simulated_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
-//      val start = System.nanoTime()
-//      val ret = B_i(deserialize(m).asInstanceOf[(Model2, Data2 => Iterable[Delta2])]._1, deserialize(d).asInstanceOf[Data2])
-//      Statistics.serialized_simulated_local_B_i.addAndGet(System.nanoTime() - start)
-//      ret
-//    }
-//    def serialized_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
-//      val start = System.nanoTime()
-//      val ret = B_i(deserialize(m).asInstanceOf[(Model2, Object)]._1, deserialize(d).asInstanceOf[Data2])
-//      Statistics.serialized_local_B_i.addAndGet(System.nanoTime() - start)
-//      ret
-//    }
+    def serialized_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
+      val start = System.nanoTime()
+      val ret = B_i(deserialize(m).asInstanceOf[Model2], deserialize(d).asInstanceOf[Data2])
+      Statistics.serialized_B_i.addAndGet(System.nanoTime() - start)
+      ret
+    }
+    def serialized_simulated_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
+      val start = System.nanoTime()
+      val ret = B_i(deserialize(m).asInstanceOf[(Model2, Data2 => Iterable[Delta2])]._1, deserialize(d).asInstanceOf[Data2])
+      Statistics.serialized_simulated_local_B_i.addAndGet(System.nanoTime() - start)
+      ret
+    }
+    def serialized_local_B_i(m: Array[Byte], d:Array[Byte]): Boolean = {
+      val start = System.nanoTime()
+      val ret = B_i(deserialize(m).asInstanceOf[(Model2, Object)]._1, deserialize(d).asInstanceOf[Data2])
+      Statistics.serialized_local_B_i.addAndGet(System.nanoTime() - start)
+      ret
+    }
     
     def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
-        // applyHash:Boolean,
+        applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2]): RDD[Output2] = {
       // Step 1: Seeding
       seeding(sqlContext, data, method)
@@ -361,25 +385,25 @@ class MLJoin2(
       // Step 2: Preparing parameters
       prepareParameters(sqlContext, models, method, g, null, null)
       
-//      if(method.compareToIgnoreCase("naive") == 0) {
-//        sqlContext.udf.register("B_i", serialized_B_i _)
-//      }
-//      else if(method.compareToIgnoreCase("simulated-local") == 0) {
-//        sqlContext.udf.register("B_i", serialized_simulated_local_B_i _)
-//      }
-//      else if(method.compareToIgnoreCase("local") == 0) {
-//        throw new RuntimeException("Unsupported method:" + method + ". If you want to apply local method, please use joinNCoGroupLocal")
-//      }
-//      else {
-//        throw new RuntimeException("Unsupported method:" + method)
-//      }
+      if(method.compareToIgnoreCase("naive") == 0) {
+        sqlContext.udf.register("B_i", serialized_B_i _)
+      }
+      else if(method.compareToIgnoreCase("simulated-local") == 0) {
+        sqlContext.udf.register("B_i", serialized_simulated_local_B_i _)
+      }
+      else if(method.compareToIgnoreCase("local") == 0) {
+        throw new RuntimeException("Unsupported method:" + method + ". If you want to apply local method, please use joinNCoGroupLocal")
+      }
+      else {
+        throw new RuntimeException("Unsupported method:" + method)
+      }
       
       // Step 3: Spark SQL join n cogroup
-      doSparkSQLJoinNCoGroup(sqlContext, method, g, null, null, data.getNumPartitions)
+      doSparkSQLJoinNCoGroup(sqlContext, method, applyHash, g, null, null, data.getNumPartitions)
     }
     
     def joinNCoGroupLocal(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
-        // applyHash:Boolean,
+        applyHash:Boolean,
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
       // For now keeping this static as we don't know cardinality of hash function
       // Also we need to ensure that we donot reduce the parallelism
@@ -391,18 +415,18 @@ class MLJoin2(
       // Step 2: Preparing parameters
       prepareParameters(sqlContext, models, method, null, g1, g2)
       
-//      if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
-//        sqlContext.udf.register("B_i", serialized_local_B_i _)
-//      }
-//      else if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
-//        throw new RuntimeException("Unsupported method:" + method + ". If you want to apply naive and simulated-local method, please use joinNCoGroup")
-//      }
-//      else {
-//        throw new RuntimeException("Unsupported method:" + method)
-//      }
+      if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
+        sqlContext.udf.register("B_i", serialized_local_B_i _)
+      }
+      else if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
+        throw new RuntimeException("Unsupported method:" + method + ". If you want to apply naive and simulated-local method, please use joinNCoGroup")
+      }
+      else {
+        throw new RuntimeException("Unsupported method:" + method)
+      }
       
       // Step 3: Spark SQL join n cogroup
-      doSparkSQLJoinNCoGroup(sqlContext, method, null, g1, g2, data.getNumPartitions)
+      doSparkSQLJoinNCoGroup(sqlContext, method, applyHash, null, g1, g2, data.getNumPartitions)
     }
     
     def convertDataToDF(sqlContext:SQLContext, X:RDD[(Long, Data2)], 
@@ -516,16 +540,23 @@ class MLJoin2(
     }
     
     def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, 
-        // applyHash:Boolean,
+        applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2],
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2], numParts: Int): RDD[Output2] = {
       val start = System.nanoTime()
       
       val sqlStr:String = 
+            if(applyHash) 
                       """
                       SELECT d.id, m.model, d.data
                       FROM Model m, Data d
                       WHERE m.hash = d.hash
+                      """
+            else 
+                      """
+                      SELECT d.id, m.model, d.data
+                      FROM Model m, Data d
+                      WHERE B_i(m.model, d.data)
                       """
       var ret :RDD[Output2] = null
       if(method.compareToIgnoreCase("naive") == 0) {
@@ -538,10 +569,10 @@ class MLJoin2(
          .map(r => (deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2],
                    (r.get(0).asInstanceOf[Long],
                    deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[Model2])))
-         .partitionBy(new HashPartitioner(numParts))
-         .cache     
-       
-        temp.count
+//         .partitionBy(new HashPartitioner(numParts))
+//         .cache     
+//       
+//        temp.count
         
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
@@ -608,9 +639,9 @@ class MLJoin2(
                             (deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2], 
                             (r.get(0).asInstanceOf[Long],
                                deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[(Model2, Object)])))
-                      .partitionBy(new HashPartitioner(numParts))
-                      .cache
-        temp.count
+//                      .partitionBy(new HashPartitioner(numParts))
+//                      .cache
+//        temp.count
         
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
