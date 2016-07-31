@@ -374,7 +374,7 @@ class MLJoin2(
 //      }
       
       // Step 3: Spark SQL join n cogroup
-      doSparkSQLJoinNCoGroup(sqlContext, method, g, null, null)
+      doSparkSQLJoinNCoGroup(sqlContext, method, g, null, null, data.getNumPartitions)
     }
     
     def joinNCoGroupLocal(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
@@ -401,7 +401,7 @@ class MLJoin2(
 //      }
       
       // Step 3: Spark SQL join n cogroup
-      doSparkSQLJoinNCoGroup(sqlContext, method, null, g1, g2)
+      doSparkSQLJoinNCoGroup(sqlContext, method, null, g1, g2, data.getNumPartitions)
     }
     
     def convertDataToDF(sqlContext:SQLContext, X:RDD[(Long, Data2)], 
@@ -514,25 +514,13 @@ class MLJoin2(
                     }).values //.sortByKey().values
     }
     
-    val useDummyB_i = true
-    def dummy_B_i(m: Array[Byte], d:Array[Byte]): Boolean = true
-    
     def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, 
         // applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2],
-        g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
+        g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2], numParts: Int): RDD[Output2] = {
       val start = System.nanoTime()
       
-      sqlContext.udf.register("dummy_B_i", dummy_B_i _)
       val sqlStr:String = 
-              if(useDummyB_i)
-                      """
-                      SELECT d.id, m.model, d.data
-                      FROM Model m, Data d
-                      WHERE m.hash = d.hash
-                      AND dummy_B_i(m.model, d.data)
-                      """
-              else
                       """
                       SELECT d.id, m.model, d.data
                       FROM Model m, Data d
@@ -544,10 +532,18 @@ class MLJoin2(
           throw new RuntimeException("The function g cannot be null");
         }
         
-        val temp:RDD[(Long, Model2, Data2)] = sqlContext.sql(sqlStr).rdd
-                      .map(r => (r.get(0).asInstanceOf[Long],
-                           deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[Model2],
-                           deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2]))
+        val temp:RDD[(Long, Model2, Data2)] =
+            (if(method.compareToIgnoreCase("global") == 0) {
+              // No need to coalesce as already partitioned
+              sqlContext.sql(sqlStr).rdd
+            }
+            else {
+              // Coalesce to increase degree of parallelism
+              sqlContext.sql(sqlStr).rdd
+              .coalesce(numParts, true)
+            }).map(r => (r.get(0).asInstanceOf[Long],
+                   deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[Model2],
+                   deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2]))
                            
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
