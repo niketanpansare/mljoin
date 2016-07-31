@@ -7,10 +7,10 @@ import org.apache.spark.SparkContext;
 import org.apache.spark.sql.SQLContext;
 
 public class LDAData2 implements Data2 {
-	public static int WB = 10; 	// total number of wordBlocks
-	public static int V = 1000;	// vocabulary size
-	public static int WBS = 100;	// wordBlock size = V / WB
-	public static int T = 2;		// total number of topics
+	public static int WB = 100; 	// total number of wordBlocks
+	public static int V = 1000000;	// vocabulary size
+	public static int WBS = 10000;	// wordBlock size = V / WB
+	public static int T = 1250;		// total number of topics
 	
 	private static final long serialVersionUID = -8280023097269439963L;
 	

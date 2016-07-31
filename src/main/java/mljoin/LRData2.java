@@ -2,14 +2,10 @@ package mljoin;
 
 import java.util.ArrayList;
 
-import org.apache.spark.SparkConf;
-import org.apache.spark.SparkContext;
-import org.apache.spark.sql.SQLContext;
-
 public class LRData2 implements Data2 {
 	public static double rate = 0.1; 	// learning rate
-	public static int N = 10;		// number of data points
-	public static int D = 4;			// number of dimensions
+	public static int N = 401065;		// number of data points
+	public static int D = 10001;		// number of dimensions
 	
 	private static final long serialVersionUID = -8280023097269439963L;
 	
