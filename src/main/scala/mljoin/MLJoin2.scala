@@ -111,19 +111,16 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             // test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             // test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
       }
       else {
-        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-            // test_B_i _, 
-            test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        throw new RuntimeException("The method " + method + " is not supported.")
       }
     }
     
@@ -173,19 +170,16 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
       }
       else {
-        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _,
-            test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        throw new RuntimeException("The method " + method + " is not supported.")
       }
       
       val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
@@ -239,19 +233,16 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, true, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
       }
       else {
-        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
-            test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        throw new RuntimeException("The method " + method + " is not supported.")
       }
       
       val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
@@ -300,19 +291,16 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, test_g _)
       }
-      else if(method.compareToIgnoreCase("local") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, test_local_g1 _, test_local_g2 _)
       }
       else {
-        (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
-//            test_B_i _, 
-            test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        throw new RuntimeException("The method " + method + " is not supported.")
       }
       
       val ret1 = ret.persist(StorageLevel.MEMORY_AND_DISK)
@@ -363,10 +351,11 @@ class MLJoin2(
 //      ret
 //    }
     
-    def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, applyHash:Boolean,
+    def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
+        // applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2]): RDD[Output2] = {
       // Step 1: Seeding
-      seeding(sqlContext, data)
+      seeding(sqlContext, data, method)
       
       // Step 2: Preparing parameters
       prepareParameters(sqlContext, models, method, g, null, null)
@@ -385,13 +374,18 @@ class MLJoin2(
 //      }
       
       // Step 3: Spark SQL join n cogroup
-      doSparkSQLJoinNCoGroup(sqlContext, method, applyHash, g, null, null)
+      doSparkSQLJoinNCoGroup(sqlContext, method, g, null, null)
     }
     
-    def joinNCoGroupLocal(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, applyHash:Boolean,
+    def joinNCoGroupLocal(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
+        // applyHash:Boolean,
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
+      // For now keeping this static as we don't know cardinality of hash function
+      // Also we need to ensure that we donot reduce the parallelism
+      numPartitions = sqlContext.sparkContext.defaultParallelism // Math.min( models.getNumPartitions, data.getNumPartitions ) 
+      
       // Step 1: Seeding
-      seeding(sqlContext, data)
+      seeding(sqlContext, data, method)
       
       // Step 2: Preparing parameters
       prepareParameters(sqlContext, models, method, null, g1, g2)
@@ -407,7 +401,7 @@ class MLJoin2(
 //      }
       
       // Step 3: Spark SQL join n cogroup
-      doSparkSQLJoinNCoGroup(sqlContext, method, applyHash, null, g1, g2)
+      doSparkSQLJoinNCoGroup(sqlContext, method, null, g1, g2)
     }
     
     def convertDataToDF(sqlContext:SQLContext, X:RDD[(Long, Data2)], 
@@ -450,9 +444,16 @@ class MLJoin2(
       sqlContext.createDataFrame(param.map( x => (new CustomRow(x._1,  B_i_model_hash(x._2._1), serialize(x._2))).asInstanceOf[Row] ), modelType)
     }
     
-    def seeding(sqlContext:SQLContext, data :RDD[Data2]):Unit = {
+    var numPartitions = -1
+    
+    def seeding(sqlContext:SQLContext, data :RDD[Data2], method:String):Unit = {
       val start = System.nanoTime()
-      val X :RDD[(Long, Data2)] = data.zipWithIndex().map(x => (x._2, x._1.asInstanceOf[Data2])).persist(StorageLevel.MEMORY_AND_DISK)
+      val X :RDD[(Long, Data2)] = 
+          (if(method.compareToIgnoreCase("global") == 0) {
+            data.zipWithIndex().partitionBy(new GlobalDataPartitioner(numPartitions, B_i_data_hash))
+          } else {
+            data.zipWithIndex()
+          }).map(x => (x._2, x._1.asInstanceOf[Data2])).persist(StorageLevel.MEMORY_AND_DISK)
       
       val count1 = X.count
       val XDF:DataFrame = convertDataToDF(sqlContext, X, B_i_data_hash)             
@@ -477,11 +478,23 @@ class MLJoin2(
         val paramDF:DataFrame = convertSimulatedLocalModelToDF(sqlContext, param, B_i_model_hash)
         paramDF.registerTempTable("Model")
       }
-      else if(method.compareToIgnoreCase("local") == 0 || method.compareToIgnoreCase("global") == 0) {
+      else if(method.compareToIgnoreCase("local") == 0) {
         // Step 2: Preparing parameters
         val param :RDD[(Long, (Model2, Object))] = models
             .zipWithIndex()
             .map(x => (x._2, (x._1, g1(x._1))))
+        val paramDF:DataFrame = convertLocalModelToDF(sqlContext, param, B_i_model_hash)
+        paramDF.registerTempTable("Model")
+      }
+      else if(method.compareToIgnoreCase("global") == 0) {
+        // Step 2: Preparing parameters
+        val repartitionedModel = models.zipWithIndex()
+                                  .partitionBy(new GlobalModelPartitioner(numPartitions, B_i_model_hash))
+                                  .persist(StorageLevel.MEMORY_AND_DISK)
+        repartitionedModel.count
+        
+        val param :RDD[(Long, (Model2, Object))] = repartitionedModel
+                                                    .map(x => (x._2, (x._1, g1(x._1))))
         val paramDF:DataFrame = convertLocalModelToDF(sqlContext, param, B_i_model_hash)
         paramDF.registerTempTable("Model")
       }
@@ -501,20 +514,16 @@ class MLJoin2(
                     }).values //.sortByKey().values
     }
     
-    def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, applyHash:Boolean,
+    def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, 
+        // applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2],
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
       val start = System.nanoTime()
-      val sqlStr:String = if(applyHash)
+      val sqlStr:String = 
                       """
                       SELECT d.id, m.model, d.data
                       FROM Model m, Data d
                       WHERE m.hash = d.hash
-                      """
-                  else
-                      """
-                      SELECT d.id, m.model, d.data
-                      FROM Model m, Data d
                       """
       var ret :RDD[Output2] = null
       if(method.compareToIgnoreCase("naive") == 0) {
