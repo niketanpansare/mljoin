@@ -564,8 +564,12 @@ class MLJoin2(
           throw new RuntimeException("The function g cannot be null");
         }
         
+       val df = sqlContext.sql(sqlStr)
+       System.out.println("SQL Plan for :" + method)
+       df.explain(true)
+       
        val temp:RDD[(Data2, (Long, Model2))] =
-         sqlContext.sql(sqlStr).rdd
+         df.rdd
          .map(r => (deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2],
                    (r.get(0).asInstanceOf[Long],
                    deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[Model2])))
