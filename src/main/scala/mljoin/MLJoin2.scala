@@ -133,8 +133,8 @@ class Test extends Logging with Serializable {
       val wordsInDoc = Array.ofDim[Int](text.length / 2)
       val wordCounts = Array.ofDim[Int](text.length / 2)
       for (i <- 0 until text.length / 2) {
-        wordsInDoc(i) = java.lang.Integer.parseInt(text(2 * i))
-        wordCounts(i) = java.lang.Integer.parseInt(text(2 * i + 1))
+        wordsInDoc(i) = java.lang.Integer.parseInt(text(2 * i).trim)
+        wordCounts(i) = java.lang.Integer.parseInt(text(2 * i + 1).trim)
       }
       new LDAData2(java.lang.Integer.parseInt(splits(0)), java.lang.Integer.parseInt(splits(1)), wordsInDoc, wordCounts).asInstanceOf[Data2]
     }
@@ -239,13 +239,13 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, true, test_g _)
       }
       else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
 //            test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
@@ -264,7 +264,7 @@ class Test extends Logging with Serializable {
       val splits = line.split('|')
       val text = splits(1).drop(1).dropRight(1).split(',')
       val point = Array.ofDim[Double](text.length)
-      for (i <- 0 until text.length) point(i) = java.lang.Double.parseDouble(text(i))
+      for (i <- 0 until text.length) point(i) = if (text(i) == null || text(i).trim.isEmpty) 0.0 else java.lang.Double.parseDouble(text(i))
       new LRData2(java.lang.Integer.parseInt(splits(0)), point, java.lang.Double.parseDouble(splits(2))).asInstanceOf[Data2]
     }
     
