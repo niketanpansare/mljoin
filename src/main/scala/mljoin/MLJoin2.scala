@@ -24,6 +24,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
 import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.HashPartitioner
 
 // Suffix "2" denotes version 2 and is just to avoid name clashes with our previous version
 trait Model2 extends Serializable
@@ -532,27 +533,24 @@ class MLJoin2(
           throw new RuntimeException("The function g cannot be null");
         }
         
-        val temp:RDD[(Long, Model2, Data2)] =
-            (if(method.compareToIgnoreCase("global") == 0) {
-              // No need to coalesce as already partitioned
-              sqlContext.sql(sqlStr).rdd
-            }
-            else {
-              // Coalesce to increase degree of parallelism
-              sqlContext.sql(sqlStr).rdd
-              .coalesce(numParts, true)
-            }).map(r => (r.get(0).asInstanceOf[Long],
-                   deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[Model2],
-                   deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2]))
-                           
+       val temp:RDD[(Data2, (Long, Model2))] =
+         sqlContext.sql(sqlStr).rdd
+         .map(r => (deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2],
+                   (r.get(0).asInstanceOf[Long],
+                   deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[Model2])))
+         .partitionBy(new HashPartitioner(numParts))
+         .cache     
+       
+        temp.count
+        
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
         ret = performAggregation(temp.map(x =>
                     {
-                       val id:Long = x._1
-                       val d:Data2 = x._3
-                       val model:Model2 = x._2
+                       val id:Long = x._2._1
+                       val d:Data2 = x._1
+                       val model:Model2 = x._2._2
                        val itDelta:Iterable[Delta2] = g(model)(d)
                        ((id, d), itDelta)
                     }))
@@ -604,21 +602,25 @@ class MLJoin2(
         if(g2 == null) {
           throw new RuntimeException("The function g2 cannot be null");
         }
-        // Join
-        val temp:RDD[(Long, (Model2, Object), Data2)] = sqlContext.sql(sqlStr).rdd
-                      .map(r => (r.get(0).asInstanceOf[Long],
-                           deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[(Model2, Object)],
-                           deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2]))
+        // Join 
+        val temp:RDD[(Data2, (Long, (Model2, Object)))] = sqlContext.sql(sqlStr).rdd
+                      .map(r =>
+                            (deserialize(r.get(2).asInstanceOf[Array[Byte]]).asInstanceOf[Data2], 
+                            (r.get(0).asInstanceOf[Long],
+                               deserialize(r.get(1).asInstanceOf[Array[Byte]]).asInstanceOf[(Model2, Object)])))
+                      .partitionBy(new HashPartitioner(numParts))
+                      .cache
+        temp.count
         
         // Step 3: Cogroup
         // Step 4: UDF invocation and final output assembly
         // TODO: Jacob: Please double check final output assembly
         ret = performAggregation(temp.map( x =>
                       {
-                        val id:Long = x._1
-                        val model: Model2 = x._2._1
-                        val appliedModel: Object = x._2._2
-                        val d:Data2 = x._3
+                        val id:Long = x._2._1
+                        val model: Model2 = x._2._2._1
+                        val appliedModel: Object = x._2._2._2
+                        val d:Data2 = x._1
                         val itDelta:Iterable[Delta2] = g2(appliedModel, d)
                         ((id, d), itDelta)
                       }))
