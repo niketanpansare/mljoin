@@ -177,13 +177,13 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+        .joinNCoGroup(sqlContext, models, data, method, true, test_g _)
       }
       else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else if(method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
