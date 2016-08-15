@@ -409,7 +409,7 @@ class MLJoin2(
       }.persist(StorageLevel.MEMORY_AND_DISK)
       ret.count
       val t1 = System.nanoTime()
-      val out = performAggregation(ret)
+      val out = performAggregation(ret).persist(StorageLevel.MEMORY_AND_DISK)
       out.count
       System.out.println("Total Time: " + (System.nanoTime() - totalStart)*(1e-9) + " sec.")
       System.out.println("Seeding: " + seedingTime + " sec.")
@@ -464,7 +464,7 @@ class MLJoin2(
       }.persist(StorageLevel.MEMORY_AND_DISK)
       ret.count
       val t1 = System.nanoTime()
-      val out = performAggregation(ret)
+      val out = performAggregation(ret).persist(StorageLevel.MEMORY_AND_DISK)
       out.count
       System.out.println("Total Time: " + (System.nanoTime() - totalStart)*(1e-9) + " sec.")
       System.out.println("Seeding: " + seedingTime + " sec.")
