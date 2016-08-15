@@ -376,6 +376,106 @@ class MLJoin2(
       ret
     }
     
+    def joinNCoGroupNew(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
+        applyHash:Boolean,
+        g: Model2 => Data2 => Iterable[Delta2]): RDD[Output2] = {
+      val totalStart = System.nanoTime()
+      
+      val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
+         if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
+         else (x._2, 0L, x._1)).persist(StorageLevel.MEMORY_AND_DISK)
+      data1.count   
+      seedingTime = (System.nanoTime() - totalStart)*(1e-9)
+         
+      var start = System.nanoTime()
+      val modelWithHash:Array[(Long, Model2)] = models.map(x => if(applyHash) (B_i_model_hash(x), x) else (0L, x)).collect
+      val model1 = sqlContext.sparkContext.broadcast(modelWithHash) 
+      globalModelBroadcastTime = (System.nanoTime() - start)*(1e-9)
+      
+      val ret: RDD[((Long, Data2), Iterable[Delta2])] =  {
+        if(method.compareToIgnoreCase("naive") == 0) {
+          data1.map(x => {
+            val m:Array[(Long, Model2)] = model1.value
+            val id:Long = x._1
+            val data_hash:Long = x._2
+            val d:Data2 = x._3
+            val it:Iterable[Delta2] = m.filter(_._1 == data_hash).flatMap(y => g(y._2)(d)).toIterable
+            ((id, d), it)
+          })
+        }
+        else {
+          throw new RuntimeException("The method is not supported:" + method)
+        }
+      }.persist(StorageLevel.MEMORY_AND_DISK)
+      ret.count
+      val t1 = System.nanoTime()
+      val out = performAggregation(ret)
+      out.count
+      System.out.println("Total Time: " + (System.nanoTime() - totalStart)*(1e-9) + " sec.")
+      System.out.println("Seeding: " + seedingTime + " sec.")
+      System.out.println("Global model broadcast time: " + globalModelBroadcastTime + " sec.")
+      System.out.println("Aggregation: " + (System.nanoTime() - t1)*(1e-9) + " sec.")
+      out
+    }
+    
+    def joinNCoGroupLocalNew(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
+        applyHash:Boolean,
+        g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
+      
+      val totalStart = System.nanoTime()
+      // For now keeping this static as we don't know cardinality of hash function
+      // Also we need to ensure that we donot reduce the parallelism
+      numPartitions = sqlContext.sparkContext.defaultParallelism // Math.min( models.getNumPartitions, data.getNumPartitions ) 
+      var start = System.nanoTime()
+      val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
+         if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
+         else (x._2, 0L, x._1)).persist(StorageLevel.MEMORY_AND_DISK)
+      data1.count   
+      seedingTime = (System.nanoTime() - start)*(1e-9)
+          
+      val ret: RDD[((Long, Data2), Iterable[Delta2])] =  {
+        if(method.compareToIgnoreCase("local") == 0) {   
+          start = System.nanoTime()
+          val modelWithHash:Array[(Long, Object)] = models.map(x => if(applyHash) (B_i_model_hash(x), g1(x)) else (0L, g1(x))).collect
+          val model1 = sqlContext.sparkContext.broadcast(modelWithHash)
+          globalModelBroadcastTime = (System.nanoTime() - start)*(1e-9)
+          
+          start = System.nanoTime()
+          data1.map(x => {
+            val m:Array[(Long, Object)] = model1.value
+            val id:Long = x._1
+            val data_hash:Long = x._2
+            val d:Data2 = x._3
+            val it:Iterable[Delta2] = m.filter(_._1 == data_hash).flatMap(y => g2(y._2, d)).toIterable
+            ((id, d), it)
+          })
+        }
+        else if(method.compareToIgnoreCase("global") == 0) {
+//          val repartitionedModel = models.zipWithIndex().map(_.swap)
+//                                  .partitionBy(new GlobalModelPartitioner(numPartitions, B_i_model_hash))
+//                                  .persist(StorageLevel.MEMORY_AND_DISK)
+//          repartitionedModel.count
+          
+          throw new RuntimeException("The method is not implemented:" + method)
+        }
+        else {
+          throw new RuntimeException("The method is not supported:" + method)
+        }
+      }.persist(StorageLevel.MEMORY_AND_DISK)
+      ret.count
+      val t1 = System.nanoTime()
+      val out = performAggregation(ret)
+      out.count
+      System.out.println("Total Time: " + (System.nanoTime() - totalStart)*(1e-9) + " sec.")
+      System.out.println("Seeding: " + seedingTime + " sec.")
+      System.out.println("Global model broadcast time: " + globalModelBroadcastTime + " sec.")
+      System.out.println("Aggregation: " + (System.nanoTime() - t1)*(1e-9) + " sec.")
+      out
+    }
+    
+    var seedingTime:Double = 0
+    var globalModelBroadcastTime:Double = 0
+    
     def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
         applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2]): RDD[Output2] = {
