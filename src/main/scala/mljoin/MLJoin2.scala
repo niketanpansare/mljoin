@@ -451,17 +451,22 @@ class MLJoin2(
           })
         }
         else if(method.compareToIgnoreCase("global") == 0) {
+          start = System.nanoTime()
           val repartitionedModel: RDD[(Long, Object)] = models.zipWithIndex().map(_.swap)
                                   .partitionBy(new GlobalModelPartitioner(numPartitions, B_i_model_hash))
                                   .map(x => (x._1, g1(x._2)))
                                   .persist(StorageLevel.MEMORY_AND_DISK)
           repartitionedModel.count
+          globalModelShuffleTime = (System.nanoTime() - start)*(1e-9)
           
+          start = System.nanoTime()
           val repartitionedData: RDD[(Long, Data2)] = data.zipWithIndex().map(_.swap)
                                   .partitionBy(new GlobalDataPartitioner(numPartitions, B_i_data_hash))
                                   .persist(StorageLevel.MEMORY_AND_DISK)
           repartitionedData.count
+          globalDataShuffleTime = (System.nanoTime() - start)*(1e-9)
           
+          start = System.nanoTime()
           repartitionedData.join(repartitionedModel)
                   .map(y => {
                     val id:Long = y._1
@@ -482,11 +487,16 @@ class MLJoin2(
       System.out.println("Seeding: " + seedingTime + " sec.")
       System.out.println("Global model broadcast time: " + globalModelBroadcastTime + " sec.")
       System.out.println("Aggregation: " + (System.nanoTime() - t1)*(1e-9) + " sec.")
+      System.out.println("Global model shuffle time: " + globalModelShuffleTime + " sec.")
+      System.out.println("Global data shuffle time: " + globalDataShuffleTime + " sec.")
       out
     }
     
     var seedingTime:Double = 0
     var globalModelBroadcastTime:Double = 0
+    
+    var globalModelShuffleTime:Double = 0
+    var globalDataShuffleTime:Double = 0
     
     def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
         applyHash:Boolean,
