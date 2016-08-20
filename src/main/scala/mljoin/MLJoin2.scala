@@ -451,12 +451,24 @@ class MLJoin2(
           })
         }
         else if(method.compareToIgnoreCase("global") == 0) {
-//          val repartitionedModel = models.zipWithIndex().map(_.swap)
-//                                  .partitionBy(new GlobalModelPartitioner(numPartitions, B_i_model_hash))
-//                                  .persist(StorageLevel.MEMORY_AND_DISK)
-//          repartitionedModel.count
+          val repartitionedModel: RDD[(Long, Object)] = models.zipWithIndex().map(_.swap)
+                                  .partitionBy(new GlobalModelPartitioner(numPartitions, B_i_model_hash))
+                                  .map(x => (x._1, g1(x._2)))
+                                  .persist(StorageLevel.MEMORY_AND_DISK)
+          repartitionedModel.count
           
-          throw new RuntimeException("The method is not implemented:" + method)
+          val repartitionedData: RDD[(Long, Data2)] = data.zipWithIndex().map(_.swap)
+                                  .partitionBy(new GlobalDataPartitioner(numPartitions, B_i_data_hash))
+                                  .persist(StorageLevel.MEMORY_AND_DISK)
+          repartitionedData.count
+          
+          repartitionedData.join(repartitionedModel)
+                  .map(y => {
+                    val id:Long = y._1
+                    val d:Data2 = y._2._1
+                    val it:Iterable[Delta2] = g2(y._2._2, d)
+                    ((id, d), it)
+                  })
         }
         else {
           throw new RuntimeException("The method is not supported:" + method)
