@@ -427,14 +427,15 @@ class MLJoin2(
       // Also we need to ensure that we donot reduce the parallelism
       numPartitions = sqlContext.sparkContext.defaultParallelism // Math.min( models.getNumPartitions, data.getNumPartitions ) 
       var start = System.nanoTime()
-      val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
-         if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
-         else (x._2, 0L, x._1)).persist(StorageLevel.MEMORY_AND_DISK)
-      data1.count   
-      seedingTime = (System.nanoTime() - start)*(1e-9)
+      
           
       val ret: RDD[((Long, Data2), Iterable[Delta2])] =  {
-        if(method.compareToIgnoreCase("local") == 0) {   
+        if(method.compareToIgnoreCase("local") == 0) {
+          val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
+             if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
+             else (x._2, 0L, x._1)).persist(StorageLevel.MEMORY_AND_DISK)
+          data1.count   
+          seedingTime = (System.nanoTime() - start)*(1e-9)
           start = System.nanoTime()
           val modelWithHash:Array[(Long, Object)] = models.map(x => if(applyHash) (B_i_model_hash(x), g1(x)) else (0L, g1(x))).collect
           val model1 = sqlContext.sparkContext.broadcast(modelWithHash)
@@ -452,16 +453,22 @@ class MLJoin2(
         }
         else if(method.compareToIgnoreCase("global") == 0) {
           start = System.nanoTime()
-          val repartitionedModel: RDD[(Long, Object)] = models.zipWithIndex().map(_.swap)
+          val repartitionedModel: RDD[(Long, Object)] = models.map(x => 
+                                   if(applyHash) (x, B_i_model_hash(x))
+                                   else throw new RuntimeException("Expected applyHash"))
                                   .partitionBy(new GlobalModelPartitioner(numPartitions, B_i_model_hash))
+                                  .map(_.swap)
                                   .map(x => (x._1, g1(x._2)))
                                   .persist(StorageLevel.MEMORY_AND_DISK)
           repartitionedModel.count
           globalModelShuffleTime = (System.nanoTime() - start)*(1e-9)
           
           start = System.nanoTime()
-          val repartitionedData: RDD[(Long, Data2)] = data.zipWithIndex().map(_.swap)
+          val repartitionedData: RDD[(Long, (Long, Data2))] = data.zipWithIndex().map(x => 
+                                   if(applyHash) (x._1, (B_i_data_hash(x._1), x._2))
+                                   else throw new RuntimeException("Expected applyHash"))
                                   .partitionBy(new GlobalDataPartitioner(numPartitions, B_i_data_hash))
+                                  .map(x => (x._2._1, (x._2._2, x._1)))
                                   .persist(StorageLevel.MEMORY_AND_DISK)
           repartitionedData.count
           globalDataShuffleTime = (System.nanoTime() - start)*(1e-9)
@@ -469,8 +476,9 @@ class MLJoin2(
           start = System.nanoTime()
           repartitionedData.join(repartitionedModel)
                   .map(y => {
-                    val id:Long = y._1
-                    val d:Data2 = y._2._1
+                    // val joinHash: Long = y._1
+                    val id:Long = y._2._1._1
+                    val d:Data2 = y._2._1._2
                     val it:Iterable[Delta2] = g2(y._2._2, d)
                     ((id, d), it)
                   })
