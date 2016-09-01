@@ -379,43 +379,127 @@ class MLJoin2(
     def joinNCoGroupNew(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
         applyHash:Boolean,
         g: Model2 => Data2 => Iterable[Delta2]): RDD[Output2] = {
-      val totalStart = System.nanoTime()
       
+      if(method.compareToIgnoreCase("naive") != 0) {
+        throw new RuntimeException("The method is not supported:" + method)
+      }
+      val totalStart = System.nanoTime()
+      val out = performAggregation(
+                  applyUDFNaive(
+                      mapSideJoinNaive(
+                          seedingNew(data, applyHash), 
+                          broadcastNaiveModelNew(sqlContext, models, applyHash)
+                      ), g))
+      
+      System.out.println("Total Time: " + (System.nanoTime() - totalStart)*(1e-9) + " sec.")
+      printStatsNew()
+      out
+    }
+    
+    def seedingNew(data :RDD[Data2], applyHash:Boolean):RDD[(Long, Long, Data2)] = {
+      val start = System.nanoTime()
       val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
          if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
          else (x._2, 0L, x._1)).persist(StorageLevel.MEMORY_AND_DISK)
       data1.count   
-      seedingTime = (System.nanoTime() - totalStart)*(1e-9)
-         
-      var start = System.nanoTime()
-      val modelWithHash:Array[(Long, Model2)] = models.map(x => if(applyHash) (B_i_model_hash(x), x) else (0L, x)).collect
-      val model1 = sqlContext.sparkContext.broadcast(modelWithHash) 
-      globalModelBroadcastTime = (System.nanoTime() - start)*(1e-9)
-      
-      val ret: RDD[((Long, Data2), Iterable[Delta2])] =  {
-        if(method.compareToIgnoreCase("naive") == 0) {
-          data1.map(x => {
+      seedingTime = (System.nanoTime() - start)*(1e-9)
+      data1
+    }
+    
+    def applyUDFNaive(joinedRDD:RDD[(Long, Data2, Model2)], g: Model2 => Data2 => Iterable[Delta2]): RDD[((Long, Data2), Iterable[Delta2])] = {
+      val start = System.nanoTime()
+      val ret = joinedRDD.map(x => {
+            val id:Long = x._1
+            val d:Data2 = x._2
+            val m:Model2 = x._3
+            ( (id, d), g(m)(d) )
+          })
+      ret.count
+      applyUDFTime = (System.nanoTime() - start)*(1e-9)
+      joinedRDD.unpersist()
+      ret
+    }
+    
+    def mapSideJoinNaive(data1:RDD[(Long, Long, Data2)], model1:Broadcast[Array[(Long, Model2)]]):RDD[(Long, Data2, Model2)] = {
+      val start = System.nanoTime()
+      val ret = data1.flatMap(x => {
             val m:Array[(Long, Model2)] = model1.value
             val id:Long = x._1
             val data_hash:Long = x._2
             val d:Data2 = x._3
-            val it:Iterable[Delta2] = m.filter(_._1 == data_hash).flatMap(y => g(y._2)(d)).toIterable
-            ((id, d), it)
-          })
-        }
-        else {
-          throw new RuntimeException("The method is not supported:" + method)
-        }
-      }.persist(StorageLevel.MEMORY_AND_DISK)
+            m.filter(_._1 == data_hash).map(m1 => (id, d, m1._2))
+      })
       ret.count
-      val t1 = System.nanoTime()
-      val out = performAggregation(ret).persist(StorageLevel.MEMORY_AND_DISK)
-      out.count
-      System.out.println("Total Time: " + (System.nanoTime() - totalStart)*(1e-9) + " sec.")
+      joinTime = (System.nanoTime() - start)*(1e-9)
+      data1.unpersist()
+      ret
+    }
+    
+    def broadcastNaiveModelNew(sqlContext:SQLContext, models :RDD[Model2], applyHash:Boolean): Broadcast[Array[(Long, Model2)]] = {
+      val start = System.nanoTime()
+      val modelWithHash:Array[(Long, Model2)] = models.map(x => if(applyHash) (B_i_model_hash(x), x) else (0L, x)).collect
+      val model1 = sqlContext.sparkContext.broadcast(modelWithHash)
+      globalModelBroadcastTime = (System.nanoTime() - start)*(1e-9)
+      model1
+    }
+    
+    def mapSideJoinLocal(data1:RDD[(Long, Long, Data2)], model1:Broadcast[Array[(Long, Object)]]):RDD[(Long, Data2, Object)] = {
+      val start = System.nanoTime()
+      val ret = data1.flatMap(x => {
+            val m:Array[(Long, Object)] = model1.value
+            val id:Long = x._1
+            val data_hash:Long = x._2
+            val d:Data2 = x._3
+            m.filter(_._1 == data_hash).map(m1 => (id, d, m1._2))
+      })
+      ret.count
+      joinTime = (System.nanoTime() - start)*(1e-9)
+      data1.unpersist()
+      ret
+    }
+    
+    def applyUDFLocal(joinedRDD:RDD[(Long, Data2, Object)], g2: (Object, Data2) => Iterable[Delta2]): RDD[((Long, Data2), Iterable[Delta2])] = {
+      val start = System.nanoTime()
+      val ret = joinedRDD.map(x => {
+            val id:Long = x._1
+            val d:Data2 = x._2
+            val m:Object = x._3
+            ( (id, d), g2(m, d) )
+          })
+      ret.count
+      applyUDFTime = (System.nanoTime() - start)*(1e-9)
+      joinedRDD.unpersist()
+      ret
+    }
+    
+    def broadcastLocalModelNew(sqlContext:SQLContext, models :RDD[Model2], applyHash:Boolean, g1: Model2 => Object): Broadcast[Array[(Long, Object)]] = {
+      val start = System.nanoTime()
+      val modelWithHash:Array[(Long, Object)] = models.map(x => if(applyHash) (B_i_model_hash(x), g1(x)) else (0L, g1(x))).collect
+      val model1 = sqlContext.sparkContext.broadcast(modelWithHash)
+      globalModelBroadcastTime = (System.nanoTime() - start)*(1e-9)
+      model1
+    }
+    
+    def performAggregation(in:RDD[((Long, Data2), Iterable[Delta2])]): RDD[Output2] = {
+      val start = System.nanoTime()
+      val ret = in.reduceByKey((it1, it2) => it1 ++ it2)
+                    .map(x => {
+                      val id:Long = x._1._1
+                      val d:Data2 = x._1._2
+                      val itDelta:Iterable[Delta2] = x._2 
+                      (id, agg(itDelta, d))
+                    }).values.persist(StorageLevel.MEMORY_AND_DISK)
+      ret.count //.sortByKey().values
+      aggregationTime  = (System.nanoTime() - start)*(1e-9)              
+      ret
+    }
+    
+    def printStatsNew() = {
       System.out.println("Seeding: " + seedingTime + " sec.")
       System.out.println("Global model broadcast time: " + globalModelBroadcastTime + " sec.")
-      System.out.println("Aggregation: " + (System.nanoTime() - t1)*(1e-9) + " sec.")
-      out
+      System.out.println("Apply UDF time: " + applyUDFTime + " sec.")
+      System.out.println("Join time: " + joinTime + " sec.")
+      System.out.println("Output Assembly: " + aggregationTime + " sec.")
     }
     
     def joinNCoGroupLocalNew(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
@@ -423,36 +507,21 @@ class MLJoin2(
         g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
       
       val totalStart = System.nanoTime()
-      // For now keeping this static as we don't know cardinality of hash function
-      // Also we need to ensure that we donot reduce the parallelism
-      numPartitions = sqlContext.sparkContext.defaultParallelism // Math.min( models.getNumPartitions, data.getNumPartitions ) 
-      var start = System.nanoTime()
-      
-          
-      val ret: RDD[((Long, Data2), Iterable[Delta2])] =  {
+      val out = 
         if(method.compareToIgnoreCase("local") == 0) {
-          val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
-             if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
-             else (x._2, 0L, x._1)).persist(StorageLevel.MEMORY_AND_DISK)
-          data1.count   
-          seedingTime = (System.nanoTime() - start)*(1e-9)
-          start = System.nanoTime()
-          val modelWithHash:Array[(Long, Object)] = models.map(x => if(applyHash) (B_i_model_hash(x), g1(x)) else (0L, g1(x))).collect
-          val model1 = sqlContext.sparkContext.broadcast(modelWithHash)
-          globalModelBroadcastTime = (System.nanoTime() - start)*(1e-9)
-          
-          start = System.nanoTime()
-          data1.map(x => {
-            val m:Array[(Long, Object)] = model1.value
-            val id:Long = x._1
-            val data_hash:Long = x._2
-            val d:Data2 = x._3
-            val it:Iterable[Delta2] = m.filter(_._1 == data_hash).flatMap(y => g2(y._2, d)).toIterable
-            ((id, d), it)
-          })
+          performAggregation(
+            applyUDFLocal(
+                mapSideJoinLocal(
+                    seedingNew(data, applyHash), 
+                    broadcastLocalModelNew(sqlContext, models, applyHash, g1)
+                ), g2))        
         }
         else if(method.compareToIgnoreCase("global") == 0) {
-          start = System.nanoTime()
+          // For now keeping this static as we don't know cardinality of hash function
+          // Also we need to ensure that we donot reduce the parallelism
+          numPartitions = sqlContext.sparkContext.defaultParallelism // Math.min( models.getNumPartitions, data.getNumPartitions ) 
+          
+          val t1 = System.nanoTime()
           val repartitionedModel: RDD[(Long, Object)] = models.map(x => 
                                    if(applyHash) (x, B_i_model_hash(x))
                                    else throw new RuntimeException("Expected applyHash"))
@@ -461,46 +530,46 @@ class MLJoin2(
                                   .map(x => (x._1, g1(x._2)))
                                   .persist(StorageLevel.MEMORY_AND_DISK)
           repartitionedModel.count
-          globalModelShuffleTime = (System.nanoTime() - start)*(1e-9)
+          globalModelShuffleTime = (System.nanoTime() - t1)*(1e-9)
           
-          start = System.nanoTime()
-          val repartitionedData: RDD[(Long, (Long, Data2))] = data.zipWithIndex().map(x => 
-                                   if(applyHash) (x._1, (B_i_data_hash(x._1), x._2))
-                                   else throw new RuntimeException("Expected applyHash"))
+          val dat1 = seedingNew(data, applyHash)
+          
+          val t2 = System.nanoTime()
+          val repartitionedData: RDD[(Long, (Long, Data2))] = dat1.map(x => 
+                                   (x._3, (x._1, x._2)))
                                   .partitionBy(new GlobalDataPartitioner(numPartitions, B_i_data_hash))
                                   .map(x => (x._2._1, (x._2._2, x._1)))
                                   .persist(StorageLevel.MEMORY_AND_DISK)
           repartitionedData.count
-          globalDataShuffleTime = (System.nanoTime() - start)*(1e-9)
+          globalDataShuffleTime = (System.nanoTime() - t2)*(1e-9)
           
-          start = System.nanoTime()
-          repartitionedData.join(repartitionedModel)
-                  .map(y => {
-                    // val joinHash: Long = y._1
-                    val id:Long = y._2._1._1
-                    val d:Data2 = y._2._1._2
-                    val it:Iterable[Delta2] = g2(y._2._2, d)
-                    ((id, d), it)
-                  })
+          val t3 = System.nanoTime()
+          val joinedRDD:RDD[(Long, Data2, Object)] = repartitionedData.join(repartitionedModel)
+                                                      .map(y =>  {
+                                                        val id:Long = y._2._1._1
+                                                        val d:Data2 = y._2._1._2
+                                                        val m:Object = y._2._2
+                                                        (id, d, m)
+                                                      }).persist(StorageLevel.MEMORY_AND_DISK)
+          joinedRDD.count
+          joinTime = (System.nanoTime() - t3)*(1e-9)
+          
+          performAggregation(
+            applyUDFLocal(joinedRDD, g2))
+          
         }
         else {
           throw new RuntimeException("The method is not supported:" + method)
         }
-      }.persist(StorageLevel.MEMORY_AND_DISK)
-      ret.count
-      val t1 = System.nanoTime()
-      val out = performAggregation(ret).persist(StorageLevel.MEMORY_AND_DISK)
-      out.count
       System.out.println("Total Time: " + (System.nanoTime() - totalStart)*(1e-9) + " sec.")
-      System.out.println("Seeding: " + seedingTime + " sec.")
-      System.out.println("Global model broadcast time: " + globalModelBroadcastTime + " sec.")
-      System.out.println("Aggregation: " + (System.nanoTime() - t1)*(1e-9) + " sec.")
-      System.out.println("Global model shuffle time: " + globalModelShuffleTime + " sec.")
-      System.out.println("Global data shuffle time: " + globalDataShuffleTime + " sec.")
+      printStatsNew()
       out
     }
     
     var seedingTime:Double = 0
+    var joinTime: Double = 0
+    var applyUDFTime: Double = 0
+    var aggregationTime: Double = 0
     var globalModelBroadcastTime:Double = 0
     
     var globalModelShuffleTime:Double = 0
@@ -657,16 +726,6 @@ class MLJoin2(
         throw new RuntimeException("Unsupported method:" + method)
       }
       Statistics.prepareParameters.addAndGet(System.nanoTime() - start)
-    }
-    
-    def performAggregation(in:RDD[((Long, Data2), Iterable[Delta2])]): RDD[Output2] = {
-      in.reduceByKey((it1, it2) => it1 ++ it2)
-                    .map(x => {
-                      val id:Long = x._1._1
-                      val d:Data2 = x._1._2
-                      val itDelta:Iterable[Delta2] = x._2 
-                      (id, agg(itDelta, d))
-                    }).values //.sortByKey().values
     }
     
     def doSparkSQLJoinNCoGroup(sqlContext:SQLContext, method:String, 
