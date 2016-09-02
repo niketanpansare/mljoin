@@ -19,4 +19,19 @@ public class GMMOutput2 implements Output2 {
 		return tuples;
 	}
 	
+	public String toString() {
+		String res = "";
+		for (GMMDelta2 tuple : tuples) {
+			double[] data = tuple.getData();
+			for (int i = 0; i < data.length; i++) {
+				if (i == 0)
+					res += "[" + data[i];
+				else
+					res += ", " + data[i];
+			}
+			res += "]\n";
+		}
+		return res;
+	}
+	
 }

@@ -177,19 +177,19 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, true, test_g _)
+        .joinNCoGroupNew(sqlContext, models, data, method, true, test_g _)
       }
       else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else if(method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
@@ -246,19 +246,19 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+        .joinNCoGroupNew(sqlContext, models, data, method, true, test_g _)
       }
       else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else if(method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
@@ -310,19 +310,19 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroup(sqlContext, models, data, method, false, test_g _)
+        .joinNCoGroupNew(sqlContext, models, data, method, true, test_g _)
       }
       else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, false, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else if(method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocal(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
       }
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
@@ -466,9 +466,9 @@ class MLJoin2(
             val m:Object = x._3
             ( (id, d), g2(m, d) )
           })
-      ret.count
+//      ret.count
       applyUDFTime = (System.nanoTime() - start)*(1e-9)
-      joinedRDD.unpersist()
+//      joinedRDD.unpersist()
       ret
     }
     
@@ -497,6 +497,8 @@ class MLJoin2(
     def printStatsNew() = {
       System.out.println("Seeding: " + seedingTime + " sec.")
       System.out.println("Global model broadcast time: " + globalModelBroadcastTime + " sec.")
+      System.out.println("Global model shuffle time: " + globalModelShuffleTime + " sec.")
+      System.out.println("Global data shuffle time: " + globalDataShuffleTime + " sec.")
       System.out.println("Apply UDF time: " + applyUDFTime + " sec.")
       System.out.println("Join time: " + joinTime + " sec.")
       System.out.println("Output Assembly: " + aggregationTime + " sec.")
@@ -536,7 +538,7 @@ class MLJoin2(
           
           val t2 = System.nanoTime()
           val repartitionedData: RDD[(Long, (Long, Data2))] = dat1.map(x => 
-                                   (x._3, (x._1, x._2)))
+                                   (x._3, (x._2, x._1)))
                                   .partitionBy(new GlobalDataPartitioner(numPartitions, B_i_data_hash))
                                   .map(x => (x._2._1, (x._2._2, x._1)))
                                   .persist(StorageLevel.MEMORY_AND_DISK)
@@ -550,8 +552,8 @@ class MLJoin2(
                                                         val d:Data2 = y._2._1._2
                                                         val m:Object = y._2._2
                                                         (id, d, m)
-                                                      }).persist(StorageLevel.MEMORY_AND_DISK)
-          joinedRDD.count
+                                                      })//.persist(StorageLevel.MEMORY_AND_DISK)
+//          joinedRDD.count
           joinTime = (System.nanoTime() - t3)*(1e-9)
           
           performAggregation(

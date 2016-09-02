@@ -182,4 +182,16 @@ public class GMMData2 implements Data2 {
 		// testGlobal(sc);
 	}
 	
+	public String toString() {
+		String res = "";
+		for (int i = 0; i < data.length; i++) {
+			if (i == 0)
+				res += "[" + data[i];
+			else
+				res += ", " + data[i];
+		}
+		res += "]\n";
+		return res;
+	}
+	
 }
