@@ -7,12 +7,10 @@ public class LDADelta2 implements Delta2, Serializable {
 	
 	int topicID;
 	int wordID;
-	int count;
 	
-	public LDADelta2(int topicID, int wordID, int count) {
+	public LDADelta2(int topicID, int wordID) {
 		this.topicID = topicID;
 		this.wordID = wordID;
-		this.count = count;
 	}
 	
 	public int getTopicID() {
@@ -21,9 +19,5 @@ public class LDADelta2 implements Delta2, Serializable {
 
 	public int getWordID() {
 		return wordID;
-	}
-	
-	public int getCount() {
-		return count;
 	}
 }

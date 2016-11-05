@@ -274,7 +274,7 @@ class Test extends Logging with Serializable {
       val splits = line.split('|')
       val text = splits(1).drop(1).dropRight(1).split(',')
       val point = Array.ofDim[Double](text.length)
-      for (i <- 0 until text.length) point(i) = if (text(i) == null || text(i).trim.isEmpty) 0.0 else java.lang.Double.parseDouble(text(i))
+      for (i <- 0 until text.length) point(i) = if (text(i) == null || text(i).trim.isEmpty || text(i).indexOf('e') != text(i).lastIndexOf('e')) 0.0 else java.lang.Double.parseDouble(text(i))
       new LRData2(java.lang.Integer.parseInt(splits(0)), point, java.lang.Double.parseDouble(splits(2))).asInstanceOf[Data2]
     }
     

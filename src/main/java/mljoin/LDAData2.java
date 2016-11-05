@@ -38,7 +38,7 @@ public class LDAData2 implements Data2 {
 		// update docProbs based on topicsOfWords but no need to output it
 		int sumByTopic[] = new int[T];
 		for (Delta2 tuple : tuples) {
-			sumByTopic[((LDADelta2)tuple).getTopicID()] += ((LDADelta2)tuple).getCount();
+			sumByTopic[((LDADelta2)tuple).getTopicID()] += 1;
 		}
 		StatUtils.dirichletConjugate(docProbs, sumByTopic, 1.0);
 		// output topicsOfWords
@@ -53,13 +53,16 @@ public class LDAData2 implements Data2 {
 			for (int j = 0; j < T; j++) {
 				workProbs[j] = docVector[j] * topicMatrix[j][wordVector[i]];
 			}
-			int outputCounts[] = new int[T];
-			// multinomial distribution to generate outputCounts based on countVector[i] and workProbs
-			StatUtils.multinomial(countVector[i], workProbs, outputCounts);
-			for (int j = 0; j < T; j++) {
-				if (outputCounts[j] > 0) {
-					tuples.add(new LDADelta2(j, wordBlockID * WBS + wordVector[i], outputCounts[j]));
-				}	
+			// int outputCounts[] = new int[T];
+			// // multinomial distribution to generate outputCounts based on countVector[i] and workProbs
+			// StatUtils.multinomial(countVector[i], workProbs, outputCounts);
+			// for (int j = 0; j < T; j++) {
+			// 	if (outputCounts[j] > 0) {
+			// 		tuples.add(new LDADelta2(j, wordBlockID * WBS + wordVector[i], outputCounts[j]));
+			// 	}	
+			// }
+			for (int k = 0; k < countVector[i]; k++) {
+				tuples.add(new LDADelta2(StatUtils.categorical(workProbs), wordBlockID * WBS + wordVector[i]));
 			}
 		}
 		return tuples;

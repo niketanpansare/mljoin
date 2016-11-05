@@ -1,6 +1,7 @@
 package mljoin;
 
 import java.util.HashMap;
+import java.util.Random;
 
 import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.ChiSquaredDistribution;
@@ -81,6 +82,19 @@ public class StatUtils {
 			sum_p += p[k];
 			sum_n += n[k];
 		}
+	}
+	
+	public static int categorical(double[] p) {
+	    double norm = 0.0;
+	    double sum = 0.0;
+	    for (int k = 0; k < p.length; k++) norm += p[k];
+	    double r = (new Random()).nextDouble();
+	    for (int k = 0; k < p.length; k++) {
+	      sum += p[k] / norm;
+	      if (r < sum)
+	        return k;
+	    }
+	    return p.length - 1;
 	}
 	
 	public static void multivariateNormal(double[] samples, double[] mean, double[][] covariance) {
