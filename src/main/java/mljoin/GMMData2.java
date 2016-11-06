@@ -166,14 +166,15 @@ public class GMMData2 implements Data2 {
 			logProb[i] = logProb[i] / sum;
 
 		// multinomial choice
-		int result[] = new int[C];
-		StatUtils.multinomial(1, logProb, result);
-		for (int i = 0; i < C; i++) {
-			if (result[i] > 0) {
-				return i;
-			}
-		}
-		return -1;
+		return StatUtils.categorical(logProb);
+		// int result[] = new int[C];
+		// StatUtils.multinomial(1, logProb, result);
+		// for (int i = 0; i < C; i++) {
+		// 	if (result[i] > 0) {
+		// 		return i;
+		// 	}
+		// }
+		// return -1;
 	}
 	
 	public static void main(String [] args) {
