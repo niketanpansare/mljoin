@@ -32,8 +32,8 @@ trait Data2 extends Serializable
 trait Delta2 extends Serializable
 trait Output2 extends Serializable
 
-trait LDADataPart1 extends Serializable
-trait LDADataPart2 extends Serializable
+trait DataPart1 extends Serializable
+trait DataPart2 extends Serializable
 
 class CustomRow(id:Long, hash:Long, foo:Array[Byte]) extends Row with Serializable {
   override def copy() = (new CustomRow(id, hash, foo)).asInstanceOf[Row]
@@ -145,17 +145,30 @@ class Test extends Logging with Serializable {
       }
       new LDAData2(java.lang.Integer.parseInt(splits(0)), java.lang.Integer.parseInt(splits(1)), wordsInDoc, wordCounts).asInstanceOf[Data2]
     }
+
+    def preprocessLDANew(line: String): (Int, LDADataPart1) = {
+      val splits = line.split('|')
+      val text = splits(2).drop(1).dropRight(1).split(',')
+      val wordsInDoc = Array.ofDim[Int](text.length / 2)
+      val wordCounts = Array.ofDim[Int](text.length / 2)
+      for (i <- 0 until text.length / 2) {
+        wordsInDoc(i) = java.lang.Integer.parseInt(text(2 * i).trim)
+        wordCounts(i) = java.lang.Integer.parseInt(text(2 * i + 1).trim)
+      }
+      (java.lang.Integer.parseInt(splits(0)), new LDADataPart1(java.lang.Integer.parseInt(splits(1)), wordsInDoc, wordCounts))
+    }
     
     // val data = sc.textFile(initialData).map(t.preprocessLDA)
-    def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2]) = {
+    def testLDA(sc:SparkContext, sqlContext:SQLContext, method:String, data:RDD[Data2], data1:RDD[(Int, LDADataPart1)]) = {
       val start = System.nanoTime()
       val models = sc.parallelize(0 to (LDAData2.WB-1), data.getNumPartitions).map(x => new LDAModel2(x).asInstanceOf[Model2])
-      def test_B_i_data_hash(d:Data2) = d.asInstanceOf[LDAData2].wordBlockID
+      val datapart2 = sc.parallelize(0 to (LDAData2.D-1)).map(x => (x, new LDADataPart2()))
+      def test_B_i_data_hash(d:Data2) = d.asInstanceOf[LDAData2].data1.getWordBlockID()
       def test_B_i_model_hash(m:Model2) = m.asInstanceOf[LDAModel2].wordBlockID
       def test_B_i(m:Model2, d:Data2):Boolean = {
         val m1: LDAModel2 = m.asInstanceOf[LDAModel2]  
         val d1: LDAData2 = d.asInstanceOf[LDAData2]
-        if(m1.wordBlockID == d1.wordBlockID) true else false
+        if(m1.wordBlockID == d1.data1.getWordBlockID()) true else false
       }
       def test_g(m:Model2)(d:Data2):Iterable[Delta2] = {
         m.asInstanceOf[LDAModel2].process()
@@ -176,6 +189,9 @@ class Test extends Logging with Serializable {
         }
         ret
       }
+      def test_mergeFn(data1:LDADataPart1, data2:LDADataPart2):Data2 = {
+      	new LDAData2(data1, data2).asInstanceOf[Data2]
+      }
       val ret = if(method.compareToIgnoreCase("naive") == 0 || method.compareToIgnoreCase("simulated-local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
@@ -186,7 +202,8 @@ class Test extends Logging with Serializable {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
             test_agg _))
-        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        // .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        .joinNCoGroupLDALocalTwoData(sqlContext, models, data1, datapart2, test_mergeFn _, method, true, test_local_g1 _, test_local_g2 _)
       }
       else if(method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
@@ -585,7 +602,7 @@ class MLJoin2(
     def joinNCoGroupLDALocalTwoData(sqlContext:SQLContext, models :RDD[Model2],
         // ---------------------------------
         // Instead of RDD[Data2]
-        data1:RDD[(Long, LDADataPart1)], data2:RDD[(Long, LDADataPart2)], mergeFn: (LDADataPart1, LDADataPart2) => Data2, 
+        data1:RDD[(Int, LDADataPart1)], data2:RDD[(Int, LDADataPart2)], mergeFn: (LDADataPart1, LDADataPart2) => Data2, 
         // ---------------------------------
         method:String, 
         applyHash:Boolean,

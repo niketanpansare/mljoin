@@ -11,36 +11,36 @@ public class LDAData2 implements Data2 {
 	public static int V = 1000000;	// vocabulary size
 	public static int WBS = 10000;	// wordBlock size = V / WB
 	public static int T = 1250;		// total number of topics
+	public static int D = 4010649;	// total number of documents
 	
 	private static final long serialVersionUID = -8280023097269439963L;
 	
-	int wordsInDoc[];
-	int wordCounts[];
-	double docProbs[];
-	int docID;
-	int wordBlockID;
+	LDADataPart1 data1;
+	LDADataPart2 data2;
+	
+	public LDAData2(LDADataPart1 data1, LDADataPart2 data2) {
+		this.data1 = data1;
+		this.data2 = data2;
+	}
 	
 	public LDAData2(int docID, int wordBlockID, int[] wordsInDoc, int[] wordCounts) {
-		this.docID = docID;
-		this.wordBlockID = wordBlockID;
-		this.wordsInDoc = wordsInDoc;
-		this.wordCounts = wordCounts;
-		// initialize docProbs with Dirichlet(prior) <=> Gamma(prior, 1)
-		docProbs = new double[T];
-		StatUtils.dirichlet(docProbs, 1.0);
+		data1 = new LDADataPart1(wordBlockID, wordsInDoc, wordCounts);
+		data2 = new LDADataPart2();
 	}
 
 	public ArrayList<Delta2> process(Model2 m) {
 		// TODO: Jacob
 		// update topicsOfWords based on m
 		long start  = System.nanoTime();
-		ArrayList<Delta2> tuples = multinomialWordTopic(wordsInDoc, wordCounts, docProbs, ((LDAModel2)m).getTopicProbs());
+		ArrayList<Delta2> tuples = multinomialWordTopic(data1.getWordsInDoc(), data1.getWordCounts(), data2.getDocProbs(), ((LDAModel2)m).getTopicProbs());
 		// update docProbs based on topicsOfWords but no need to output it
 		int sumByTopic[] = new int[T];
 		for (Delta2 tuple : tuples) {
 			sumByTopic[((LDADelta2)tuple).getTopicID()] += 1;
 		}
+		double docProbs[] = new double[T];
 		StatUtils.dirichletConjugate(docProbs, sumByTopic, 1.0);
+		data2.setDocProbs(docProbs);
 		// output topicsOfWords
 		Statistics.dataProcessTime().addAndGet(System.nanoTime()-start);
 		return tuples;
@@ -62,7 +62,7 @@ public class LDAData2 implements Data2 {
 			// 	}	
 			// }
 			for (int k = 0; k < countVector[i]; k++) {
-				tuples.add(new LDADelta2(StatUtils.categorical(workProbs), wordBlockID * WBS + wordVector[i]));
+				tuples.add(new LDADelta2(StatUtils.categorical(workProbs), data1.getWordBlockID() * WBS + wordVector[i]));
 			}
 		}
 		return tuples;
