@@ -32,6 +32,9 @@ trait Data2 extends Serializable
 trait Delta2 extends Serializable
 trait Output2 extends Serializable
 
+trait LDADataPart1 extends Serializable
+trait LDADataPart2 extends Serializable
+
 class CustomRow(id:Long, hash:Long, foo:Array[Byte]) extends Row with Serializable {
   override def copy() = (new CustomRow(id, hash, foo)).asInstanceOf[Row]
   override def get(i: Int) = if(i == 0) id else if(i == 1) hash else foo
@@ -400,8 +403,9 @@ class MLJoin2(
       val start = System.nanoTime()
       val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
          if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
-         else (x._2, 0L, x._1)).persist(StorageLevel.MEMORY_AND_DISK)
-      data1.count   
+         else (x._2, 0L, x._1))
+//         .persist(StorageLevel.MEMORY_AND_DISK)
+//      data1.count   
       seedingTime = (System.nanoTime() - start)*(1e-9)
       data1
     }
@@ -452,9 +456,9 @@ class MLJoin2(
             val d:Data2 = x._3
             m.filter(_._1 == data_hash).map(m1 => (id, d, m1._2))
       })
-      ret.count
+//      ret.count
       joinTime = (System.nanoTime() - start)*(1e-9)
-      data1.unpersist()
+//      data1.unpersist()
       ret
     }
     
@@ -576,6 +580,20 @@ class MLJoin2(
     
     var globalModelShuffleTime:Double = 0
     var globalDataShuffleTime:Double = 0
+    
+    // Jacob invoke this method instead
+    def joinNCoGroupLDALocalTwoData(sqlContext:SQLContext, models :RDD[Model2],
+        // ---------------------------------
+        // Instead of RDD[Data2]
+        data1:RDD[(Long, LDADataPart1)], data2:RDD[(Long, LDADataPart2)], mergeFn: (LDADataPart1, LDADataPart2) => Data2, 
+        // ---------------------------------
+        method:String, 
+        applyHash:Boolean,
+        g1: Model2 => Object, g2: (Object, Data2) => Iterable[Delta2]): RDD[Output2] = {
+     joinNCoGroupLocalNew(sqlContext, models, 
+         data1.join(data2).map(x => mergeFn(x._2._1, x._2._2)), 
+         method, applyHash, g1, g2)
+    }
     
     def joinNCoGroup(sqlContext:SQLContext, models :RDD[Model2], data :RDD[Data2], method:String, 
         applyHash:Boolean,
