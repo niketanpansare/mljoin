@@ -201,9 +201,9 @@ class Test extends Logging with Serializable {
       else if(method.compareToIgnoreCase("local") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
             test_B_i _, 
-            test_agg _))
-        // .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
-        .joinNCoGroupLDALocalTwoData(sqlContext, models, data1, datapart2, test_mergeFn _, method, true, test_local_g1 _, test_local_g2 _)
+            test_agg _, false))
+        .joinNCoGroupLocalNew(sqlContext, models, data, method, true, test_local_g1 _, test_local_g2 _)
+        // .joinNCoGroupLDALocalTwoData(sqlContext, models, data1, datapart2, test_mergeFn _, method, true, test_local_g1 _, test_local_g2 _)
       }
       else if(method.compareToIgnoreCase("global") == 0) {
         (new MLJoin2(test_B_i_model_hash _, test_B_i_data_hash _, 
@@ -361,7 +361,7 @@ class MLJoin2(
         B_i_model_hash: Model2 => Long,
         B_i_data_hash: Data2 => Long,
         B_i: (Model2, Data2) => Boolean,
-        agg: (Iterable[Delta2], Data2) => Output2) extends Logging with Serializable {
+        agg: (Iterable[Delta2], Data2) => Output2, broadcastBasedJoin:Boolean = true) extends Logging with Serializable {
  
     def serialize(o:Object):Array[Byte] = {
       val start = System.nanoTime()
@@ -464,6 +464,14 @@ class MLJoin2(
       model1
     }
     
+    def nonMapSideJoinLocal(data1:RDD[(Long, Long, Data2)], model1:RDD[(Long, Object)]):RDD[(Long, Data2, Object)] = {
+      val start = System.nanoTime()
+      val ret = data1.map(x => (x._2, (x._1, x._3))).join(model1).map(y => (y._2._1._1, y._2._1._2, y._2._2))
+      joinTime = (System.nanoTime() - start)*(1e-9)
+//      data1.unpersist()
+      ret
+    }
+    
     def mapSideJoinLocal(data1:RDD[(Long, Long, Data2)], model1:Broadcast[Array[(Long, Object)]]):RDD[(Long, Data2, Object)] = {
       val start = System.nanoTime()
       val ret = data1.flatMap(x => {
@@ -491,6 +499,10 @@ class MLJoin2(
       applyUDFTime = (System.nanoTime() - start)*(1e-9)
 //      joinedRDD.unpersist()
       ret
+    }
+    
+    def nonBroadcastLocalModelNew(sqlContext:SQLContext, models :RDD[Model2], applyHash:Boolean, g1: Model2 => Object): RDD[(Long, Object)] = {
+      models.map(x => if(applyHash) (B_i_model_hash(x), g1(x)) else (0L, g1(x))) 
     }
     
     def broadcastLocalModelNew(sqlContext:SQLContext, models :RDD[Model2], applyHash:Boolean, g1: Model2 => Object): Broadcast[Array[(Long, Object)]] = {
@@ -532,12 +544,22 @@ class MLJoin2(
       val totalStart = System.nanoTime()
       val out = 
         if(method.compareToIgnoreCase("local") == 0) {
-          performAggregation(
-            applyUDFLocal(
+          if(broadcastBasedJoin) {
+            performAggregation(
+              applyUDFLocal(
                 mapSideJoinLocal(
                     seedingNew(data, applyHash), 
                     broadcastLocalModelNew(sqlContext, models, applyHash, g1)
-                ), g2))        
+                ), g2))
+          }
+          else {
+             performAggregation(
+              applyUDFLocal(
+                nonMapSideJoinLocal(
+                    seedingNew(data, applyHash), 
+                    nonBroadcastLocalModelNew(sqlContext, models, applyHash, g1)
+                ), g2))
+          }
         }
         else if(method.compareToIgnoreCase("global") == 0) {
           // For now keeping this static as we don't know cardinality of hash function
