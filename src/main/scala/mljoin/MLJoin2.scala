@@ -515,7 +515,10 @@ class MLJoin2(
     
     def performAggregation(in:RDD[((Long, Data2), Iterable[Delta2])]): RDD[Output2] = {
       val start = System.nanoTime()
-      val ret = in.reduceByKey((it1, it2) => it1 ++ it2)
+      val ret = in
+                  /// -------------- To test whether reducebykey is the issue
+                  .map(x => ((x._1._1, new LDAData2(1, 1, null, null).asInstanceOf[Data2]), (new ArrayList[LDADelta2]).toList.toIterable))
+                  .reduceByKey((it1, it2) => it1 ++ it2)
                     .map(x => {
                       val id:Long = x._1._1
                       val d:Data2 = x._1._2
@@ -525,6 +528,8 @@ class MLJoin2(
       ret.count //.sortByKey().values
       aggregationTime  = (System.nanoTime() - start)*(1e-9)              
       ret
+      
+      
     }
     
     def printStatsNew() = {
