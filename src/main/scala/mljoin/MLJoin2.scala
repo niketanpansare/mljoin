@@ -29,7 +29,9 @@ import org.apache.spark.HashPartitioner
 // Suffix "2" denotes version 2 and is just to avoid name clashes with our previous version
 trait Model2 extends Serializable
 trait Data2 extends Serializable
-trait Delta2 extends Serializable
+trait Delta2 extends Serializable {
+  def combine(d1:Iterable[Delta2], d2:Iterable[Delta2]):Iterable[Delta2];
+}
 trait Output2 extends Serializable
 
 trait DataPart1 extends Serializable
@@ -40,8 +42,7 @@ class MLJoin2(
         B_i_model_hash: Model2 => Long,
         B_i_data_hash: Data2 => Long,
         B_i: (Model2, Data2) => Boolean,
-        agg: (Iterable[Delta2], Data2) => Output2,
-        combiner: (Iterable[Delta2], Data2) => Iterable[Delta2], 
+        agg: (Iterable[Delta2], Data2) => Output2, 
         broadcastBasedJoin:Boolean = true) extends Logging with Serializable {
     
     // Step 1: Seeding here refers to the process of appending each data item from the set X with a unique identifier.
@@ -104,8 +105,14 @@ class MLJoin2(
       val ret = in.map(e => (e._1._1, (e._1._2, e._2)))
                   .reduceByKey((it1, it2) => {
                      val d:Data2 = it1._1 // should be same as it2._1 
-                     val deltas:Iterable[Delta2] = it1._2 ++ it2._2
-                     (d, combiner(deltas, d))
+                     val deltas1:Iterable[Delta2] = it1._2
+                     val deltas2:Iterable[Delta2] = it2._2
+                     val combined = (deltas1.size, deltas2.size) match {
+                       case (0, _) => deltas2
+                       case (_, 0) => deltas1
+                       case _ => deltas1.head.combine(deltas1, deltas2)
+                     }
+                     (d, combined)
                     })
                    .map(e => {
                      val d:Data2 = e._2._1
