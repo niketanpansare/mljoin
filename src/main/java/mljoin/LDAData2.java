@@ -2,10 +2,6 @@ package mljoin;
 
 import java.util.ArrayList;
 
-import org.apache.spark.SparkConf;
-import org.apache.spark.SparkContext;
-import org.apache.spark.sql.SQLContext;
-
 public class LDAData2 implements Data2 {
 	public static int WB = 100; 	// total number of wordBlocks
 	public static int V = 1000000;	// vocabulary size
@@ -120,14 +116,5 @@ public class LDAData2 implements Data2 {
 		return tuples;
 	}
 	
-	public static void main(String [] args) {
-		SparkConf conf = new SparkConf().setMaster("local[*]").setAppName("My local integration test app");
-		SparkContext sc = new SparkContext(conf);
-		SQLContext sqlCtx = new SQLContext(sc);
-		LDADemo demo = new LDADemo();
-		
-		demo.naiveLDA(sqlCtx, demo.randData(sc), demo.randData(sc), demo.randData(sc));
-		// testGlobal(sc);
-	}
 	
 }
