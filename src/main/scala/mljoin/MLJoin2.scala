@@ -111,6 +111,7 @@ object MLJoin2 {
       else {
         throw new RuntimeException("The method " + method + " is not supported.")
       }
+      ret.count()
       System.out.println("Total execution time for testLR(" + method + "):" + (System.nanoTime() - start)*(1e-9) + " sec.\n")
       ret
     }
@@ -126,9 +127,13 @@ class MLJoin2(
     // Step 1: Seeding here refers to the process of appending each data item from the set X with a unique identifier.
     def seeding(data :RDD[Data2], applyHash:Boolean):RDD[(Long, Long, Data2)] = {
       val start = System.nanoTime()
-      val data1:RDD[(Long, Long, Data2)] = data.zipWithIndex().map(x => 
+      val persistedData = data.persist(StorageLevel.MEMORY_AND_DISK) // We persist here to avoid re-reading and re-parsing of the data 
+      val data1:RDD[(Long, Long, Data2)] = persistedData.zipWithIndex().map(x => 
          if(applyHash) (x._2, B_i_data_hash(x._1), x._1)
          else (x._2, 0L, x._1))
+         .persist(StorageLevel.MEMORY_AND_DISK) // This needs to be persisted to preserve the hash
+      data1.count()
+      persistedData.unpersist(true)
       seedingTime = (System.nanoTime() - start)*(1e-9)
       data1
     }
@@ -199,11 +204,13 @@ class MLJoin2(
             (id, agg(itDelta, d))
           }).values
       }
-      val ret = if(MLJoin2.PERSIST_RDD) {
-        ret1.persist(StorageLevel.MEMORY_AND_DISK)
-        ret1.count
-        ret1
-      } else ret1
+      val ret = ret1
+      // Not required as we run only 1 iteration.
+//      val ret = if(MLJoin2.PERSIST_RDD) {
+//        ret1.persist(StorageLevel.MEMORY_AND_DISK)
+//        ret1.count
+//        ret1
+//      } else ret1
       aggregationTime  = (System.nanoTime() - start)*(1e-9)              
       ret
     }
