@@ -48,7 +48,7 @@ object MLJoin2 {
       val inputPath = args(2)
       args(0) match {
         case "generate_lr_data" => {
-          val rdd = sc.parallelize(1 until 41352204).map(id => id.toString + "|" + (0 until 10000).map(x => new Random().nextDouble).mkString(",") + "|" + new Random().nextDouble)
+          val rdd = sc.parallelize(1 until 500000).map(id => id.toString + "|" + (0 until 10000).map(x => new Random().nextDouble).mkString(",") + "|" + new Random().nextDouble)
           rdd.saveAsTextFile(inputPath)
         }
         case "lr" => testLR(sc, sqlContext, method, sc.textFile(inputPath).map(line => preprocessLR(line)))
