@@ -24,6 +24,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
 import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.HashPartitioner
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
 
 // Suffix "2" denotes version 2 and is just to avoid name clashes with our previous version
 trait Model2 extends Serializable
@@ -52,6 +54,17 @@ object MLJoin2 {
           rdd.saveAsTextFile(inputPath)
         }
         case "lr" => testLR(sc, sqlContext, method, sc.textFile(inputPath).map(line => preprocessLR(line)))
+        case "mllib_lr" => {
+          val data = sc.textFile(inputPath).map(line => preprocessLR(line)).map({
+            data2 => if(data2.isInstanceOf[LRData2]) {
+              val lrData = data2.asInstanceOf[LRData2]
+              new LabeledPoint(lrData.y, Vectors.dense(lrData.x))
+            } else throw new RuntimeException("Unsupported data type")
+          })
+          val mllibLR = new org.apache.spark.mllib.regression.LinearRegressionWithSGD()
+          mllibLR.optimizer.setMiniBatchFraction(1.0)
+          mllibLR.run(data)
+        }
         case _ => throw new RuntimeException("Unsupported algorithm:" + args(0))
       }
     }
