@@ -65,6 +65,11 @@ object MLJoin2 {
           mllibLR.optimizer.setMiniBatchFraction(1.0)
           mllibLR.run(data)
         }
+        case "lr_read_time" => {
+          val start = System.nanoTime()
+          sc.textFile(inputPath).map(line => preprocessLR(line)).persist(StorageLevel.MEMORY_AND_DISK).count()
+          System.out.println("Time taken to read the dataset: " +  ((System.nanoTime() - start).toDouble*1e-9)  + " sec.\n" )
+        }
         case _ => throw new RuntimeException("Unsupported algorithm:" + args(0))
       }
     }
