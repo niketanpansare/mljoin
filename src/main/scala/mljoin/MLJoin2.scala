@@ -62,7 +62,7 @@ object MLJoin2 {
             } else throw new RuntimeException("Unsupported data type")
           })
           val mllibLR = new org.apache.spark.mllib.regression.LinearRegressionWithSGD()
-          mllibLR.optimizer.setMiniBatchFraction(1.0)
+          mllibLR.optimizer.setMiniBatchFraction(1.0).setNumIterations(1)
           mllibLR.run(data)
         }
         case "lr_read_time" => {
